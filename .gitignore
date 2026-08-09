@@ -5,3 +5,10 @@ build/
 xcuserdata/
 *.xccheckout
 *.xcscmblueprint
+ContactsDeduper_*.json
+*.contactsbackup
+ContactBackups/
+*.mobileprovision
+*.p12
+*.pem
+*.key

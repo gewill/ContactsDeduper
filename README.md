@@ -2,6 +2,8 @@
 
 ContactsDeduper 是一个使用 SwiftUI 和 Contacts 框架构建的本地通讯录去重工具，同时支持 iOS 17+ 与 macOS 14+。
 
+[隐私说明](PRIVACY.md) · [安全审查](SECURITY_REVIEW.md) · [MIT 许可证](LICENSE)
+
 ## 功能
 
 - 扫描姓名、电话号码或邮箱相同的联系人。
@@ -68,3 +70,6 @@ xcodebuild -project ContactsDeduper.xcodeproj \
 - `ContactsDeduper/Info.plist`：iOS 权限与应用配置。
 - `ContactsDeduper/Info-macOS.plist`：macOS 权限与应用配置。
 
+## 许可证
+
+本项目采用 [MIT License](LICENSE)。
