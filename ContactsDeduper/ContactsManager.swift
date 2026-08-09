@@ -85,10 +85,15 @@ struct ContactListBulkMergeResult {
 }
 
 extension CNContact {
+    /// `CNContactFormatter` needs private sorting keys that no public
+    /// `CNContactXXXKey` constant covers, so contacts must be fetched with this
+    /// descriptor before a name can be formatted.
+    static let displayNameDescriptor = CNContactFormatter.descriptorForRequiredKeys(for: .fullName)
+
     var displayName: String {
-        let formatter = CNContactFormatter()
-        formatter.style = .fullName
-        return formatter.string(from: self)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        guard areKeysAvailable([Self.displayNameDescriptor]) else { return "未命名联系人" }
+        return CNContactFormatter.string(from: self, style: .fullName)?
+            .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             ?? organizationName.nilIfEmpty
             ?? "未命名联系人"
     }
@@ -497,6 +502,7 @@ final class ContactsManager: ObservableObject {
 
     private func fetchContacts(in containerIdentifier: String? = nil) throws -> [CNContact] {
         let keys: [CNKeyDescriptor] = [
+            CNContact.displayNameDescriptor,
             CNContactIdentifierKey as CNKeyDescriptor,
             CNContactTypeKey as CNKeyDescriptor,
             CNContactNamePrefixKey as CNKeyDescriptor,
