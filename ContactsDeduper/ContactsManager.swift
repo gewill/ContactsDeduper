@@ -84,6 +84,86 @@ struct ContactListBulkMergeResult {
     let addedMemberCount: Int
 }
 
+enum DuplicateMatchKind: String {
+    case name
+    case phone
+    case email
+}
+
+/// How much evidence two contacts must share before they count as duplicates.
+enum DuplicateMatchRule: String, CaseIterable, Identifiable {
+    case dual
+    case any
+    case nameOnly
+    case phoneOnly
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .dual:
+            return "两项相同"
+        case .any:
+            return "任一项相同"
+        case .nameOnly:
+            return "仅名字相同"
+        case .phoneOnly:
+            return "仅电话相同"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .dual:
+            return "姓名、电话、邮箱中至少两项同时相同才算重复"
+        case .any:
+            return "姓名、电话或邮箱任意一项相同就算重复"
+        case .nameOnly:
+            return "只看姓名，忽略电话与邮箱"
+        case .phoneOnly:
+            return "只看电话，忽略姓名与邮箱"
+        }
+    }
+
+    var consideredKinds: Set<DuplicateMatchKind> {
+        switch self {
+        case .dual, .any:
+            return [.name, .phone, .email]
+        case .nameOnly:
+            return [.name]
+        case .phoneOnly:
+            return [.phone]
+        }
+    }
+
+    var requiredMatchCount: Int {
+        self == .dual ? 2 : 1
+    }
+}
+
+struct BulkMergePlanItem: Identifiable {
+    let id: String
+    let title: String
+    let reasonSummary: String
+    let keeperName: String
+    let keeperSummary: String
+    let removedNames: [String]
+    let additions: [String]
+
+    var removedSummary: String {
+        removedNames.joined(separator: "、")
+    }
+
+    var additionSummary: String {
+        additions.isEmpty ? "无新增资料" : additions.joined(separator: " · ")
+    }
+}
+
+private struct ContactPair: Hashable {
+    let first: String
+    let second: String
+}
+
 extension CNContact {
     /// `CNContactFormatter` needs private sorting keys that no public
     /// `CNContactXXXKey` constant covers, so contacts must be fetched with this
@@ -125,10 +205,18 @@ final class ContactsManager: ObservableObject {
     @Published private(set) var bulkMergeStatus: String?
     @Published private(set) var contactListMergeProgress: Double?
     @Published private(set) var contactListMergeStatus: String?
+    @Published private(set) var matchRule: DuplicateMatchRule = .dual
     @Published var isLoading = false
     @Published var errorMessage: String?
 
+    private static let matchRuleDefaultsKey = "duplicateMatchRule"
+
     private let store = CNContactStore()
+
+    init() {
+        let storedRule = UserDefaults.standard.string(forKey: Self.matchRuleDefaultsKey)
+        matchRule = storedRule.flatMap(DuplicateMatchRule.init(rawValue:)) ?? .dual
+    }
 
     var isBulkMerging: Bool {
         bulkMergeProgress != nil
@@ -210,6 +298,13 @@ final class ContactsManager: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func setMatchRule(_ rule: DuplicateMatchRule) {
+        guard rule != matchRule else { return }
+        matchRule = rule
+        UserDefaults.standard.set(rule.rawValue, forKey: Self.matchRuleDefaultsKey)
+        duplicateGroups = findDuplicates(in: allContacts)
     }
 
     func makeBackupDocument() throws -> ContactsBackupDocument {
@@ -341,12 +436,31 @@ final class ContactsManager: ObservableObject {
         }
     }
 
-    func mergeAllDuplicates() async throws -> BulkMergeResult {
+    /// Dry run of `mergeAllDuplicates`: what each group would keep, delete, and gain.
+    func makeBulkMergePlan() -> [BulkMergePlanItem] {
+        duplicateGroups.compactMap { group in
+            guard let keeper = preferredKeeper(in: group) else { return nil }
+            let removed = group.contacts.filter { $0.identifier != keeper.identifier }
+            guard !removed.isEmpty else { return nil }
+
+            return BulkMergePlanItem(
+                id: group.id,
+                title: group.displayName,
+                reasonSummary: group.reasonSummary,
+                keeperName: keeper.displayName,
+                keeperSummary: contactSummary(keeper),
+                removedNames: removed.map(\.displayName),
+                additions: additionSummaries(keeper: keeper, others: removed)
+            )
+        }
+    }
+
+    func mergeAllDuplicates(groupIDs: Set<String>) async throws -> BulkMergeResult {
         guard hasContactsAccess else {
             throw ContactsBackupError.accessDenied
         }
 
-        let groups = duplicateGroups
+        let groups = duplicateGroups.filter { groupIDs.contains($0.id) }
         guard !groups.isEmpty else {
             return BulkMergeResult(
                 mergedGroupCount: 0,
@@ -744,6 +858,7 @@ final class ContactsManager: ObservableObject {
         var buckets: [String: Set<String>] = [:]
         var byID: [String: CNContact] = [:]
         var reasonByKey: [String: String] = [:]
+        var kindByKey: [String: DuplicateMatchKind] = [:]
 
         for contact in contacts {
             byID[contact.identifier] = contact
@@ -755,6 +870,7 @@ final class ContactsManager: ObservableObject {
                 let key = "phone:\(phone)"
                 buckets[key, default: []].insert(contact.identifier)
                 reasonByKey[key] = "相同电话 \(phone)"
+                kindByKey[key] = .phone
             }
 
             let emails = contact.emailAddresses
@@ -764,6 +880,7 @@ final class ContactsManager: ObservableObject {
                 let key = "email:\(email)"
                 buckets[key, default: []].insert(contact.identifier)
                 reasonByKey[key] = "相同邮箱 \(email)"
+                kindByKey[key] = .email
             }
 
             let nameKey = normalizeName(contact)
@@ -771,7 +888,14 @@ final class ContactsManager: ObservableObject {
                 let key = "name:\(nameKey)"
                 buckets[key, default: []].insert(contact.identifier)
                 reasonByKey[key] = "相同姓名 \(contact.displayName)"
+                kindByKey[key] = .name
             }
+        }
+
+        let consideredKinds = matchRule.consideredKinds
+        let candidateBuckets = buckets.filter { key, ids in
+            guard ids.count > 1, let kind = kindByKey[key] else { return false }
+            return consideredKinds.contains(kind)
         }
 
         var parent = Dictionary(uniqueKeysWithValues: contacts.map { ($0.identifier, $0.identifier) })
@@ -790,31 +914,58 @@ final class ContactsManager: ObservableObject {
             }
         }
 
-        let duplicateBuckets = buckets.filter { $0.value.count > 1 }
-        for ids in duplicateBuckets.values {
-            guard let first = ids.first else { continue }
-            for id in ids.dropFirst() {
-                union(first, id)
+        if matchRule.requiredMatchCount > 1 {
+            // A shared bucket is only one piece of evidence, so tally the kinds of
+            // evidence per contact pair and link a pair only once it clears the bar.
+            var kindsByPair: [ContactPair: Set<DuplicateMatchKind>] = [:]
+            for (key, ids) in candidateBuckets {
+                guard let kind = kindByKey[key] else { continue }
+                let sortedIDs = ids.sorted()
+                for firstIndex in sortedIDs.indices {
+                    for secondIndex in sortedIDs.index(after: firstIndex)..<sortedIDs.endIndex {
+                        let pair = ContactPair(
+                            first: sortedIDs[firstIndex],
+                            second: sortedIDs[secondIndex]
+                        )
+                        kindsByPair[pair, default: []].insert(kind)
+                    }
+                }
+            }
+
+            for (pair, kinds) in kindsByPair where kinds.count >= matchRule.requiredMatchCount {
+                union(pair.first, pair.second)
+            }
+        } else {
+            for ids in candidateBuckets.values {
+                guard let first = ids.first else { continue }
+                for id in ids.dropFirst() {
+                    union(first, id)
+                }
             }
         }
 
         var groupedIDs: [String: Set<String>] = [:]
-        for ids in duplicateBuckets.values {
-            for id in ids {
-                groupedIDs[root(id), default: []].insert(id)
-            }
+        for contact in contacts {
+            groupedIDs[root(contact.identifier), default: []].insert(contact.identifier)
         }
 
+        // A bucket can span several groups now, so credit each group only with the
+        // members it actually contains.
         var reasonsByRoot: [String: [DuplicateReason]] = [:]
-        for (key, ids) in duplicateBuckets.sorted(by: { $0.key < $1.key }) {
-            guard let first = ids.first else { continue }
-            reasonsByRoot[root(first), default: []].append(
-                DuplicateReason(
-                    id: key,
-                    description: reasonByKey[key] ?? "疑似重复",
-                    contactIDs: ids
+        for (key, ids) in candidateBuckets {
+            var idsByRoot: [String: Set<String>] = [:]
+            for id in ids {
+                idsByRoot[root(id), default: []].insert(id)
+            }
+            for (rootID, sharedIDs) in idsByRoot where sharedIDs.count > 1 {
+                reasonsByRoot[rootID, default: []].append(
+                    DuplicateReason(
+                        id: key,
+                        description: reasonByKey[key] ?? "疑似重复",
+                        contactIDs: sharedIDs
+                    )
                 )
-            )
+            }
         }
 
         let groups = groupedIDs.compactMap { rootID, ids -> DuplicateGroup? in
@@ -822,61 +973,17 @@ final class ContactsManager: ObservableObject {
             guard contacts.count > 1 else { return nil }
             return DuplicateGroup(
                 id: stableGroupID(for: ids),
-                reasons: reasonsByRoot[rootID, default: []],
+                reasons: reasonsByRoot[rootID, default: []].sorted { $0.id < $1.id },
                 contacts: contacts
             )
         }
 
-        return uniqueDuplicateGroups(groups).sorted {
+        return groups.sorted {
             if $0.contacts.count == $1.contacts.count {
                 return $0.displayName < $1.displayName
             }
             return $0.contacts.count > $1.contacts.count
         }
-    }
-
-    private func uniqueDuplicateGroups(_ groups: [DuplicateGroup]) -> [DuplicateGroup] {
-        var groupsByMembership: [String: DuplicateGroup] = [:]
-
-        for group in groups {
-            let contactIDs = Set(group.contacts.map(\.identifier))
-            let membershipKey = stableGroupID(for: contactIDs)
-
-            guard let existing = groupsByMembership[membershipKey] else {
-                groupsByMembership[membershipKey] = DuplicateGroup(
-                    id: membershipKey,
-                    reasons: uniqueReasons(group.reasons),
-                    contacts: group.contacts
-                )
-                continue
-            }
-
-            groupsByMembership[membershipKey] = DuplicateGroup(
-                id: membershipKey,
-                reasons: uniqueReasons(existing.reasons + group.reasons),
-                contacts: existing.contacts
-            )
-        }
-
-        return Array(groupsByMembership.values)
-    }
-
-    private func uniqueReasons(_ reasons: [DuplicateReason]) -> [DuplicateReason] {
-        var reasonsByID: [String: DuplicateReason] = [:]
-
-        for reason in reasons {
-            if let existing = reasonsByID[reason.id] {
-                reasonsByID[reason.id] = DuplicateReason(
-                    id: reason.id,
-                    description: existing.description,
-                    contactIDs: existing.contactIDs.union(reason.contactIDs)
-                )
-            } else {
-                reasonsByID[reason.id] = reason
-            }
-        }
-
-        return reasonsByID.values.sorted { $0.id < $1.id }
     }
 
     private func stableGroupID(for contactIDs: Set<String>) -> String {
@@ -994,6 +1101,67 @@ final class ContactsManager: ObservableObject {
             + (contact.birthday == nil ? 0 : 2)
             + (contact.nonGregorianBirthday == nil ? 0 : 2)
             + (contact.imageDataAvailable ? 3 : 0)
+    }
+
+    private func contactSummary(_ contact: CNContact) -> String {
+        [contact.phoneSummary, contact.emailSummary, contact.organizationName]
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+    }
+
+    private func additionSummaries(keeper: CNContact, others: [CNContact]) -> [String] {
+        let merged = keeper.mutableCopy() as! CNMutableContact
+        for contact in others {
+            mergeValues(from: contact, into: merged)
+        }
+
+        var summaries: [String] = []
+        func appendGrowth(_ label: String, _ before: Int, _ after: Int) {
+            if after > before {
+                summaries.append("\(label) +\(after - before)")
+            }
+        }
+
+        appendGrowth("电话", keeper.phoneNumbers.count, merged.phoneNumbers.count)
+        appendGrowth("邮箱", keeper.emailAddresses.count, merged.emailAddresses.count)
+        appendGrowth("地址", keeper.postalAddresses.count, merged.postalAddresses.count)
+        appendGrowth("网址", keeper.urlAddresses.count, merged.urlAddresses.count)
+        appendGrowth("纪念日", keeper.dates.count, merged.dates.count)
+        appendGrowth("关系", keeper.contactRelations.count, merged.contactRelations.count)
+        appendGrowth("社交", keeper.socialProfiles.count, merged.socialProfiles.count)
+        appendGrowth(
+            "即时通讯",
+            keeper.instantMessageAddresses.count,
+            merged.instantMessageAddresses.count
+        )
+
+        if keeper.birthday == nil, merged.birthday != nil {
+            summaries.append("生日")
+        }
+        if keeper.nonGregorianBirthday == nil, merged.nonGregorianBirthday != nil {
+            summaries.append("农历生日")
+        }
+        if !keeper.imageDataAvailable, merged.imageData != nil {
+            summaries.append("头像")
+        }
+
+        let filledTextCount = zip(textFields(of: keeper), textFields(of: merged))
+            .filter { $0.isEmpty && !$1.isEmpty }
+            .count
+        if filledTextCount > 0 {
+            summaries.append("文字资料 +\(filledTextCount)")
+        }
+
+        return summaries
+    }
+
+    private func textFields(of contact: CNContact) -> [String] {
+        [
+            contact.namePrefix, contact.givenName, contact.middleName, contact.familyName,
+            contact.previousFamilyName, contact.nameSuffix, contact.nickname,
+            contact.phoneticGivenName, contact.phoneticMiddleName, contact.phoneticFamilyName,
+            contact.organizationName, contact.departmentName, contact.jobTitle
+        ]
     }
 
     private func uniqueLabeledValues<Value>(

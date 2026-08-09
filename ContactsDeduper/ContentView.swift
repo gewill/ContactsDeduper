@@ -276,7 +276,7 @@ struct ContentView: View {
 private struct AccountDuplicatesView: View {
     let account: ContactAccount
     @ObservedObject var manager: ContactsManager
-    @State private var showContactMergeConfirmation = false
+    @State private var mergePlan: BulkMergePlan?
     @State private var showListMergeConfirmation = false
     @State private var mergeReport: BulkMergeResult?
     @State private var notice: AppNotice?
@@ -294,7 +294,9 @@ private struct AccountDuplicatesView: View {
         .navigationTitle(account.name)
         .inlineNavigationTitleOnIOS()
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                matchRuleMenu
+
                 Button {
                     Task { await manager.loadAccount(account) }
                 } label: {
@@ -307,17 +309,11 @@ private struct AccountDuplicatesView: View {
         .task(id: account.id) {
             await manager.loadAccount(account)
         }
-        .confirmationDialog(
-            "合并 \(manager.duplicateGroups.count) 组重复联系人？",
-            isPresented: $showContactMergeConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("合并并删除重复项", role: .destructive) {
-                Task { await mergeContacts() }
+        .sheet(item: $mergePlan) { plan in
+            BulkMergePreviewView(accountName: account.name, items: plan.items) { selectedIDs in
+                Task { await mergeContacts(groupIDs: selectedIDs) }
             }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("只处理“\(account.name)”账户。每组保留资料最完整的一项，并补齐其他资料。建议先导出备份。")
+            .presentationDetentsOnIOS()
         }
         .confirmationDialog(
             "合并 \(manager.duplicateContactLists.count) 组同名 List？",
@@ -346,6 +342,28 @@ private struct AccountDuplicatesView: View {
 
     private var isMerging: Bool {
         manager.isBulkMerging || manager.isBulkMergingContactLists
+    }
+
+    private var matchRuleMenu: some View {
+        Menu {
+            Picker("判定标准", selection: matchRuleBinding) {
+                ForEach(DuplicateMatchRule.allCases) { rule in
+                    Text(rule.title).tag(rule)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+        }
+        .accessibilityLabel("重复判定标准，当前为\(manager.matchRule.title)")
+        .disabled(isMerging)
+    }
+
+    private var matchRuleBinding: Binding<DuplicateMatchRule> {
+        Binding(
+            get: { manager.matchRule },
+            set: { manager.setMatchRule($0) }
+        )
     }
 
     private var resultsList: some View {
@@ -431,19 +449,26 @@ private struct AccountDuplicatesView: View {
                         systemImage: "person.2.badge.gearshape",
                         isDisabled: isMerging || manager.duplicateGroups.isEmpty
                     ) {
-                        showContactMergeConfirmation = true
+                        showMergePreview()
                     }
                 }
             }
         }
         .safeAreaInset(edge: .top) {
-            HStack {
-                Label("账户内查重", systemImage: "sparkle.magnifyingglass")
-                Spacer()
-                Text("共 \(manager.allContacts.count) 人")
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Label("账户内查重", systemImage: "sparkle.magnifyingglass")
+                    Spacer()
+                    Text("共 \(manager.allContacts.count) 人")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.subheadline.weight(.medium))
+
+                Text("判定标准：\(manager.matchRule.title) — \(manager.matchRule.detail)")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .font(.subheadline.weight(.medium))
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
             .background(.bar)
         }
@@ -454,19 +479,34 @@ private struct AccountDuplicatesView: View {
         ContentUnavailableView {
             Label("这个账户没有重复项", systemImage: "checkmark.seal")
         } description: {
-            Text("已扫描“\(account.name)”中的 \(manager.allContacts.count) 个联系人和 List。")
+            Text("已扫描“\(account.name)”中的 \(manager.allContacts.count) 个联系人和 List。当前判定标准为“\(manager.matchRule.title)”，即\(manager.matchRule.detail)。")
         } actions: {
             Button("重新扫描") {
                 Task { await manager.loadAccount(account) }
             }
             .buttonStyle(.borderedProminent)
+
+            if manager.matchRule != .any {
+                Button("放宽为任一项相同") {
+                    manager.setMatchRule(.any)
+                }
+            }
         }
     }
 
+    private func showMergePreview() {
+        let items = manager.makeBulkMergePlan()
+        guard !items.isEmpty else {
+            notice = AppNotice(message: "没有可合并的重复联系人。")
+            return
+        }
+        mergePlan = BulkMergePlan(items: items)
+    }
+
     @MainActor
-    private func mergeContacts() async {
+    private func mergeContacts(groupIDs: Set<String>) async {
         do {
-            mergeReport = try await manager.mergeAllDuplicates()
+            mergeReport = try await manager.mergeAllDuplicates(groupIDs: groupIDs)
         } catch {
             notice = AppNotice(message: "联系人合并失败：\(error.localizedDescription)")
         }
@@ -532,6 +572,134 @@ private struct MergeProgressRow: View {
 private struct PendingContactImport {
     let data: Data
     let preview: ContactImportPreview
+}
+
+private struct BulkMergePlan: Identifiable {
+    let id = UUID()
+    let items: [BulkMergePlanItem]
+}
+
+private struct BulkMergePreviewView: View {
+    let accountName: String
+    let items: [BulkMergePlanItem]
+    let onConfirm: (Set<String>) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedIDs: Set<String>
+
+    init(accountName: String, items: [BulkMergePlanItem], onConfirm: @escaping (Set<String>) -> Void) {
+        self.accountName = accountName
+        self.items = items
+        self.onConfirm = onConfirm
+        _selectedIDs = State(initialValue: Set(items.map(\.id)))
+    }
+
+    private var deletionCount: Int {
+        items
+            .filter { selectedIDs.contains($0.id) }
+            .reduce(0) { $0 + $1.removedNames.count }
+    }
+
+    private var isEverythingSelected: Bool {
+        selectedIDs.count == items.count
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(items) { item in
+                        Button {
+                            toggle(item.id)
+                        } label: {
+                            row(for: item)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    HStack {
+                        Text("已选 \(selectedIDs.count) / \(items.count) 组")
+                        Spacer()
+                        Button(isEverythingSelected ? "全不选" : "全选") {
+                            selectedIDs = isEverythingSelected ? [] : Set(items.map(\.id))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .textCase(nil)
+                } footer: {
+                    Text("只处理“\(accountName)”账户。每组保留资料最完整的一项并补齐资料，其余联系人会被删除且不可撤销。建议先导出备份。")
+                }
+            }
+            .navigationTitle("合并预览")
+            .inlineNavigationTitleOnIOS()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("合并并删除 \(deletionCount) 项", role: .destructive) {
+                        dismiss()
+                        onConfirm(selectedIDs)
+                    }
+                    .disabled(selectedIDs.isEmpty)
+                }
+            }
+        }
+        .bulkMergePreviewFrameOnMac()
+    }
+
+    private func toggle(_ id: String) {
+        if selectedIDs.contains(id) {
+            selectedIDs.remove(id)
+        } else {
+            selectedIDs.insert(id)
+        }
+    }
+
+    private func row(for item: BulkMergePlanItem) -> some View {
+        let isSelected = selectedIDs.contains(item.id)
+
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.title3)
+                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(item.title)
+                    .font(.headline)
+
+                Label("保留 \(item.keeperName)", systemImage: "person.crop.circle.badge.checkmark")
+                    .font(.subheadline)
+                    .foregroundStyle(.green)
+
+                if !item.keeperSummary.isEmpty {
+                    Text(item.keeperSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Label(
+                    "删除 \(item.removedNames.count) 项：\(item.removedSummary)",
+                    systemImage: "trash"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.red)
+
+                Label("补齐 \(item.additionSummary)", systemImage: "plus.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text("依据：\(item.reasonSummary)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
 }
 
 private struct AppNotice: Identifiable {
@@ -850,6 +1018,24 @@ private extension View {
     func detailTextStyle() -> some View {
         font(.subheadline)
             .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    func presentationDetentsOnIOS() -> some View {
+#if os(iOS)
+        presentationDetents([.large])
+#else
+        self
+#endif
+    }
+
+    @ViewBuilder
+    func bulkMergePreviewFrameOnMac() -> some View {
+#if os(macOS)
+        frame(minWidth: 620, minHeight: 540)
+#else
+        self
+#endif
     }
 
     @ViewBuilder
