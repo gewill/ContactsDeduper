@@ -106,7 +106,7 @@ enum DuplicateMatchRule: String, CaseIterable, Identifiable {
         case .any:
             return "任一项相同"
         case .nameOnly:
-            return "仅名字相同"
+            return "仅名称相同"
         case .phoneOnly:
             return "仅电话相同"
         }
@@ -119,7 +119,7 @@ enum DuplicateMatchRule: String, CaseIterable, Identifiable {
         case .any:
             return "任一项"
         case .nameOnly:
-            return "仅名字"
+            return "仅名称"
         case .phoneOnly:
             return "仅电话"
         }
@@ -128,13 +128,13 @@ enum DuplicateMatchRule: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .dual:
-            return "姓名、电话、邮箱中至少两项同时相同才算重复"
+            return "名称、电话、邮箱中至少两项同时相同才算重复"
         case .any:
-            return "姓名、电话或邮箱任意一项相同就算重复"
+            return "名称、电话或邮箱任意一项相同就算重复"
         case .nameOnly:
-            return "只看姓名，忽略电话与邮箱"
+            return "只看名称，公司类联系人按公司名比对"
         case .phoneOnly:
-            return "只看电话，忽略姓名与邮箱"
+            return "只看电话，忽略名称与邮箱"
         }
     }
 
@@ -896,11 +896,10 @@ final class ContactsManager: ObservableObject {
                 kindByKey[key] = .email
             }
 
-            let nameKey = normalizeName(contact)
-            if !nameKey.isEmpty {
-                let key = "name:\(nameKey)"
+            if let nameSignal = nameSignal(for: contact) {
+                let key = "name:\(nameSignal.key)"
                 buckets[key, default: []].insert(contact.identifier)
-                reasonByKey[key] = "相同姓名 \(contact.displayName)"
+                reasonByKey[key] = nameSignal.description
                 kindByKey[key] = .name
             }
         }
@@ -1207,10 +1206,22 @@ final class ContactsManager: ObservableObject {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    private func normalizeName(_ contact: CNContact) -> String {
-        [contact.familyName, contact.givenName, contact.middleName]
+    /// Company-only contacts carry no person name, so fall back to the organization —
+    /// it is what `displayName` already shows for them. The fallback is deliberately
+    /// *not* an extra signal for contacts that do have a person name: colleagues
+    /// legitimately share an employer, and pairing that with a shared switchboard
+    /// number would merge two different people.
+    private func nameSignal(for contact: CNContact) -> (key: String, description: String)? {
+        let personName = [contact.familyName, contact.givenName, contact.middleName]
             .joined()
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
+        if !personName.isEmpty {
+            return (personName.lowercased(), "相同姓名 \(contact.displayName)")
+        }
+
+        let organizationName = contact.organizationName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !organizationName.isEmpty else { return nil }
+        return (organizationName.lowercased(), "相同公司 \(organizationName)")
     }
 }
