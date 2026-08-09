@@ -5,47 +5,40 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var manager = ContactsManager()
-    @State private var selectedGroup: DuplicateGroup?
     @State private var exportDocument = ContactsBackupDocument()
+    @State private var exportedContactCount = 0
     @State private var isExporting = false
     @State private var isImporting = false
     @State private var pendingImport: PendingContactImport?
     @State private var showImportConfirmation = false
     @State private var showDeleteAllConfirmation = false
-    @State private var showBulkMergeConfirmation = false
-    @State private var mergeReport: BulkMergeResult?
     @State private var notice: AppNotice?
 
     var body: some View {
         NavigationStack {
             Group {
-                if manager.isLoading {
-                    ProgressView("正在扫描通讯录")
+                if manager.isLoading && manager.contactAccounts.isEmpty {
+                    ProgressView("正在加载通讯录账户")
                 } else if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted {
                     permissionView
-                } else if manager.duplicateGroups.isEmpty {
+                } else if manager.contactAccounts.isEmpty {
                     emptyView
                 } else {
-                    duplicateList
+                    accountList
                 }
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if manager.isBulkMerging || (!manager.isLoading && !manager.duplicateGroups.isEmpty) {
-                    bulkMergePanel
-                }
-            }
-            .navigationTitle("通讯录去重")
+            .navigationTitle("通讯录账户")
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     backupMenu
 
                     Button {
-                        Task { await manager.refresh() }
+                        Task { await manager.loadAccounts() }
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .accessibilityLabel("重新扫描")
-                    .disabled(manager.isLoading || manager.isBulkMerging)
+                    .accessibilityLabel("重新加载账户")
+                    .disabled(isBusy)
                 }
             }
             .task {
@@ -59,14 +52,6 @@ struct ContentView: View {
             } message: {
                 Text(manager.errorMessage ?? "")
             }
-            .sheet(item: $selectedGroup) { group in
-                DuplicateDetailView(group: group, manager: manager)
-                    .presentationDetents([.medium, .large])
-            }
-            .sheet(item: $mergeReport) { report in
-                MergeReportView(report: report)
-                    .presentationDetents([.medium, .large])
-            }
             .fileExporter(
                 isPresented: $isExporting,
                 document: exportDocument,
@@ -76,7 +61,7 @@ struct ContentView: View {
                 switch result {
                 case .success(let url):
                     notice = AppNotice(
-                        message: "已导出 \(manager.allContacts.count) 个联系人到 \(url.lastPathComponent)。"
+                        message: "已导出 \(exportedContactCount) 个联系人到 \(url.lastPathComponent)。"
                     )
                 case .failure(let error) where isUserCancellation(error):
                     break
@@ -105,7 +90,7 @@ struct ContentView: View {
                 }
             }
             .confirmationDialog(
-                "删除全部 \(manager.allContacts.count) 个联系人？",
+                "删除全部可访问联系人？",
                 isPresented: $showDeleteAllConfirmation,
                 titleVisibility: .visible
             ) {
@@ -114,22 +99,50 @@ struct ContentView: View {
                 }
                 Button("取消", role: .cancel) {}
             } message: {
-                Text("此操作不可撤销。请先使用“导出备份”，确认备份文件可用后再继续。")
-            }
-            .confirmationDialog(
-                "同步合并全部 \(manager.duplicateGroups.count) 组联系人？",
-                isPresented: $showBulkMergeConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("合并并删除全部重复项", role: .destructive) {
-                    Task { await performBulkMerge() }
-                }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text("每组将自动保留资料最完整的联系人，补齐其他资料后删除重复项。建议先导出备份。")
+                Text("此操作会删除所有账户中可访问的联系人且不可撤销。请先导出备份。")
             }
             .alert(item: $notice) { notice in
-                Alert(title: Text("操作结果"), message: Text(notice.message), dismissButton: .default(Text("好")))
+                Alert(
+                    title: Text("操作结果"),
+                    message: Text(notice.message),
+                    dismissButton: .default(Text("好"))
+                )
+            }
+        }
+    }
+
+    private var isBusy: Bool {
+        manager.isLoading || manager.isBulkMerging || manager.isBulkMergingContactLists
+    }
+
+    private var accountList: some View {
+        List {
+            Section("账户") {
+                ForEach(manager.contactAccounts) { account in
+                    NavigationLink {
+                        AccountDuplicatesView(account: account, manager: manager)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.crop.rectangle.stack")
+                                .font(.title2)
+                                .foregroundStyle(.blue)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(account.name)
+                                    .font(.headline)
+                                Text(account.typeName)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+                            Text("\(account.contactCount) 人")
+                                .font(.subheadline.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 5)
+                    }
+                }
             }
         }
     }
@@ -155,47 +168,12 @@ struct ContentView: View {
             } label: {
                 Label("删除全部联系人", systemImage: "trash")
             }
-            .disabled(manager.allContacts.isEmpty)
+            .disabled(manager.totalContactCount == 0)
         } label: {
             Image(systemName: "archivebox")
         }
         .accessibilityLabel("备份与恢复")
-        .disabled(manager.isLoading || manager.isBulkMerging)
-    }
-
-    private var bulkMergePanel: some View {
-        VStack(spacing: 10) {
-            if let progress = manager.bulkMergeProgress {
-                HStack {
-                    Text(manager.bulkMergeStatus ?? "正在同步合并")
-                        .font(.subheadline.weight(.medium))
-                    Spacer()
-                    Text("\(Int(progress * 100))%")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                ProgressView(value: progress, total: 1)
-                    .progressViewStyle(.linear)
-            } else {
-                Button {
-                    showBulkMergeConfirmation = true
-                } label: {
-                    Label(
-                        "一键同步合并 \(manager.duplicateGroups.count) 组",
-                        systemImage: "person.2.badge.gearshape"
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-            }
-        }
-        .frame(maxWidth: 520)
-        .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
+        .disabled(isBusy)
     }
 
     private var importDialogTitle: String {
@@ -215,6 +193,7 @@ struct ContentView: View {
     private func prepareExport() {
         do {
             exportDocument = try manager.makeBackupDocument()
+            exportedContactCount = try ContactsBackupArchive.decode(from: exportDocument.data).contacts.count
             isExporting = true
         } catch {
             notice = AppNotice(message: "无法创建备份：\(error.localizedDescription)")
@@ -223,8 +202,7 @@ struct ContentView: View {
 
     private func isUserCancellation(_ error: Error) -> Bool {
         let cocoaError = error as NSError
-        return cocoaError.domain == NSCocoaErrorDomain
-            && cocoaError.code == NSUserCancelledError
+        return cocoaError.domain == NSCocoaErrorDomain && cocoaError.code == NSUserCancelledError
     }
 
     private func prepareImport(from result: Result<URL, Error>) {
@@ -259,16 +237,6 @@ struct ContentView: View {
     }
 
     @MainActor
-    private func performBulkMerge() async {
-        do {
-            let result = try await manager.mergeAllDuplicates()
-            mergeReport = result
-        } catch {
-            notice = AppNotice(message: "同步合并失败：\(error.localizedDescription)")
-        }
-    }
-
-    @MainActor
     private func restoreContacts(from pending: PendingContactImport) async {
         do {
             let result = try await manager.importBackup(data: pending.data)
@@ -283,60 +251,14 @@ struct ContentView: View {
         pendingImport = nil
     }
 
-    private var duplicateList: some View {
-        List(manager.duplicateGroups) { group in
-            Button {
-                selectedGroup = group
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.2.crop.square.stack")
-                        .font(.title2)
-                        .foregroundStyle(.blue)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(group.displayName)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                        Text(group.reasonSummary)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Text(group.detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 6)
-            }
-        }
-        .safeAreaInset(edge: .top) {
-            summaryBar
-        }
-        .disabled(manager.isBulkMerging)
-    }
-
-    private var summaryBar: some View {
-        HStack {
-            Label("\(manager.duplicateGroups.count) 组重复", systemImage: "sparkle.magnifyingglass")
-            Spacer()
-            Text("共 \(manager.allContacts.count) 人")
-                .foregroundStyle(.secondary)
-        }
-        .font(.subheadline.weight(.medium))
-        .padding()
-        .background(.bar)
-    }
-
     private var emptyView: some View {
         ContentUnavailableView {
-            Label("没有发现重复联系人", systemImage: "checkmark.seal")
+            Label("没有可用通讯录账户", systemImage: "person.crop.rectangle.stack")
         } description: {
-            Text("已扫描 \(manager.allContacts.count) 个联系人。")
+            Text("系统没有返回可访问的本机、iCloud 或其他通讯录账户。")
         } actions: {
-            Button("重新扫描") {
-                Task { await manager.refresh() }
+            Button("重新加载") {
+                Task { await manager.loadAccounts() }
             }
             .buttonStyle(.borderedProminent)
         }
@@ -348,6 +270,262 @@ struct ContentView: View {
         } description: {
             Text("打开系统设置，为 ContactsDeduper 启用通讯录访问权限。")
         }
+    }
+}
+
+private struct AccountDuplicatesView: View {
+    let account: ContactAccount
+    @ObservedObject var manager: ContactsManager
+    @State private var showContactMergeConfirmation = false
+    @State private var showListMergeConfirmation = false
+    @State private var mergeReport: BulkMergeResult?
+    @State private var notice: AppNotice?
+
+    var body: some View {
+        Group {
+            if manager.isLoading {
+                ProgressView("正在扫描“\(account.name)”")
+            } else if manager.duplicateGroups.isEmpty && manager.duplicateContactLists.isEmpty {
+                emptyView
+            } else {
+                resultsList
+            }
+        }
+        .navigationTitle(account.name)
+        .inlineNavigationTitleOnIOS()
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await manager.loadAccount(account) }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .accessibilityLabel("重新扫描账户")
+                .disabled(isMerging)
+            }
+        }
+        .task(id: account.id) {
+            await manager.loadAccount(account)
+        }
+        .confirmationDialog(
+            "合并 \(manager.duplicateGroups.count) 组重复联系人？",
+            isPresented: $showContactMergeConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("合并并删除重复项", role: .destructive) {
+                Task { await mergeContacts() }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("只处理“\(account.name)”账户。每组保留资料最完整的一项，并补齐其他资料。建议先导出备份。")
+        }
+        .confirmationDialog(
+            "合并 \(manager.duplicateContactLists.count) 组同名 List？",
+            isPresented: $showListMergeConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("合并同名 List", role: .destructive) {
+                Task { await mergeLists() }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("只处理“\(account.name)”账户。成员会汇总到保留的 List，再删除其余同名 List；不会删除联系人。")
+        }
+        .sheet(item: $mergeReport) { report in
+            MergeReportView(report: report)
+                .presentationDetents([.medium, .large])
+        }
+        .alert(item: $notice) { notice in
+            Alert(
+                title: Text("操作结果"),
+                message: Text(notice.message),
+                dismissButton: .default(Text("好"))
+            )
+        }
+    }
+
+    private var isMerging: Bool {
+        manager.isBulkMerging || manager.isBulkMergingContactLists
+    }
+
+    private var resultsList: some View {
+        List {
+            if !manager.duplicateContactLists.isEmpty || manager.isBulkMergingContactLists {
+                Section {
+                    if let progress = manager.contactListMergeProgress {
+                        MergeProgressRow(
+                            progress: progress,
+                            status: manager.contactListMergeStatus ?? "正在合并 List"
+                        )
+                    }
+
+                    ForEach(manager.duplicateContactLists) { duplicateList in
+                        HStack(spacing: 12) {
+                            Image(systemName: "list.bullet")
+                                .font(.title2)
+                                .foregroundStyle(.orange)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(duplicateList.name)
+                                    .font(.headline)
+                                Text(duplicateList.detail)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 5)
+                    }
+                } header: {
+                    DedupSectionHeader(
+                        title: "重复 List",
+                        count: manager.duplicateContactLists.count,
+                        buttonTitle: "合并全部",
+                        systemImage: "rectangle.stack.badge.plus",
+                        isDisabled: isMerging || manager.duplicateContactLists.isEmpty
+                    ) {
+                        showListMergeConfirmation = true
+                    }
+                }
+            }
+
+            if !manager.duplicateGroups.isEmpty || manager.isBulkMerging {
+                Section {
+                    if let progress = manager.bulkMergeProgress {
+                        MergeProgressRow(
+                            progress: progress,
+                            status: manager.bulkMergeStatus ?? "正在合并联系人"
+                        )
+                    }
+
+                    ForEach(manager.duplicateGroups) { group in
+                        NavigationLink {
+                            DuplicateDetailView(group: group, manager: manager)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.2.crop.square.stack")
+                                    .font(.title2)
+                                    .foregroundStyle(.blue)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(group.displayName)
+                                        .font(.headline)
+                                    Text(group.reasonSummary)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+                                Text(group.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 6)
+                        }
+                    }
+                } header: {
+                    DedupSectionHeader(
+                        title: "重复联系人",
+                        count: manager.duplicateGroups.count,
+                        buttonTitle: "一键合并",
+                        systemImage: "person.2.badge.gearshape",
+                        isDisabled: isMerging || manager.duplicateGroups.isEmpty
+                    ) {
+                        showContactMergeConfirmation = true
+                    }
+                }
+            }
+        }
+        .safeAreaInset(edge: .top) {
+            HStack {
+                Label("账户内查重", systemImage: "sparkle.magnifyingglass")
+                Spacer()
+                Text("共 \(manager.allContacts.count) 人")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.subheadline.weight(.medium))
+            .padding()
+            .background(.bar)
+        }
+        .disabled(isMerging)
+    }
+
+    private var emptyView: some View {
+        ContentUnavailableView {
+            Label("这个账户没有重复项", systemImage: "checkmark.seal")
+        } description: {
+            Text("已扫描“\(account.name)”中的 \(manager.allContacts.count) 个联系人和 List。")
+        } actions: {
+            Button("重新扫描") {
+                Task { await manager.loadAccount(account) }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
+    @MainActor
+    private func mergeContacts() async {
+        do {
+            mergeReport = try await manager.mergeAllDuplicates()
+        } catch {
+            notice = AppNotice(message: "联系人合并失败：\(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func mergeLists() async {
+        do {
+            let result = try await manager.mergeAllDuplicateContactLists()
+            notice = AppNotice(
+                message: "已合并 \(result.mergedSetCount) 组同名 List，删除 \(result.deletedListCount) 个重复 List，并补充 \(result.addedMemberCount) 位成员。"
+            )
+        } catch {
+            notice = AppNotice(message: "List 合并失败：\(error.localizedDescription)")
+        }
+    }
+}
+
+private struct DedupSectionHeader: View {
+    let title: String
+    let count: Int
+    let buttonTitle: String
+    let systemImage: String
+    let isDisabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("\(title) · \(count) 组")
+            Spacer()
+            Button(action: action) {
+                Label(buttonTitle, systemImage: systemImage)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(isDisabled)
+        }
+        .textCase(nil)
+    }
+}
+
+private struct MergeProgressRow: View {
+    let progress: Double
+    let status: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(status)
+                    .font(.subheadline.weight(.medium))
+                Spacer()
+                Text("\(Int(progress * 100))%")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            ProgressView(value: progress, total: 1)
+                .progressViewStyle(.linear)
+        }
+        .padding(.vertical, 6)
     }
 }
 
@@ -386,26 +564,10 @@ private struct MergeReportView: View {
                         columns: [GridItem(.flexible()), GridItem(.flexible())],
                         spacing: 12
                     ) {
-                        ReportMetric(
-                            title: "已合并",
-                            value: "\(report.mergedGroupCount) 组",
-                            systemImage: "person.2.fill"
-                        )
-                        ReportMetric(
-                            title: "已清理",
-                            value: "\(report.deletedContactCount) 项",
-                            systemImage: "trash.fill"
-                        )
-                        ReportMetric(
-                            title: "剩余重复",
-                            value: "\(report.remainingDuplicateGroupCount) 组",
-                            systemImage: "checkmark.circle"
-                        )
-                        ReportMetric(
-                            title: "处理耗时",
-                            value: durationText,
-                            systemImage: "clock.fill"
-                        )
+                        ReportMetric(title: "已合并", value: "\(report.mergedGroupCount) 组", systemImage: "person.2.fill")
+                        ReportMetric(title: "已清理", value: "\(report.deletedContactCount) 项", systemImage: "trash.fill")
+                        ReportMetric(title: "剩余重复", value: "\(report.remainingDuplicateGroupCount) 组", systemImage: "checkmark.circle")
+                        ReportMetric(title: "处理耗时", value: durationText, systemImage: "clock.fill")
                     }
 
                     VStack(spacing: 12) {
@@ -451,10 +613,9 @@ private struct MergeReportView: View {
     }
 
     private var durationText: String {
-        if report.duration < 1 {
-            return String(format: "%.1f 秒", report.duration)
-        }
-        return "\(Int(report.duration.rounded())) 秒"
+        report.duration < 1
+            ? String(format: "%.1f 秒", report.duration)
+            : "\(Int(report.duration.rounded())) 秒"
     }
 }
 
@@ -490,8 +651,11 @@ private struct ConfettiCelebrationView: View {
             if isActive {
                 TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
                     Canvas { context, size in
-                        let elapsed = timeline.date.timeIntervalSince(startedAt)
-                        drawConfetti(in: &context, size: size, elapsed: elapsed)
+                        drawConfetti(
+                            in: &context,
+                            size: size,
+                            elapsed: timeline.date.timeIntervalSince(startedAt)
+                        )
                     }
                 }
             }
@@ -531,10 +695,7 @@ private struct ConfettiCelebrationView: View {
             if index.isMultiple(of: 3) {
                 context.fill(Path(ellipseIn: rect), with: .color(color))
             } else {
-                context.fill(
-                    Path(roundedRect: rect, cornerRadius: 1.5),
-                    with: .color(color)
-                )
+                context.fill(Path(roundedRect: rect, cornerRadius: 1.5), with: .color(color))
             }
         }
     }
@@ -559,66 +720,66 @@ struct DuplicateDetailView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section("查重依据") {
-                    ForEach(group.reasons) { reason in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(reason.description)
-                                .font(.body.weight(.medium))
-                            Text(reason.matchingContactNames(in: group.contacts))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 2)
+        List {
+            Section("查重依据") {
+                ForEach(group.reasons) { reason in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(reason.description)
+                            .font(.body.weight(.medium))
+                        Text(reason.matchingContactNames(in: group.contacts))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
+                    .padding(.vertical, 2)
                 }
+            }
 
-                Section("保留联系人") {
-                    Picker("保留", selection: $keeperID) {
-                        ForEach(group.contacts, id: \.identifier) { contact in
-                            Text(contact.displayName).tag(contact.identifier)
-                        }
-                    }
-                }
-
-                Section("重复项") {
+            Section("保留联系人") {
+                Picker("保留", selection: $keeperID) {
                     ForEach(group.contacts, id: \.identifier) { contact in
-                        ContactRow(contact: contact, isKeeper: contact.identifier == keeperID) {
-                            Task {
-                                await manager.delete(contact)
-                                dismiss()
-                            }
+                        Text(contact.displayName).tag(contact.identifier)
+                    }
+                }
+            }
+
+            Section("联系人详情") {
+                ForEach(group.contacts, id: \.identifier) { contact in
+                    ContactRow(contact: contact, isKeeper: contact.identifier == keeperID) {
+                        Task {
+                            await manager.delete(contact)
+                            dismiss()
                         }
                     }
                 }
-            }
-            .navigationTitle(group.displayName)
-            .inlineNavigationTitleOnIOS()
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("合并") {
-                        showMergeConfirmation = true
-                    }
-                    .disabled(group.contacts.count < 2)
-                }
-            }
-            .confirmationDialog("合并后会删除未保留的重复联系人", isPresented: $showMergeConfirmation, titleVisibility: .visible) {
-                Button("合并并删除重复项", role: .destructive) {
-                    guard let keeper = group.contacts.first(where: { $0.identifier == keeperID }) else { return }
-                    Task {
-                        await manager.merge(group, keeping: keeper)
-                        dismiss()
-                    }
-                }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text("查重依据：\(group.reasonSummary)。请确认这些联系人确实属于同一个人。")
             }
         }
+        .navigationTitle(group.displayName)
+        .inlineNavigationTitleOnIOS()
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("合并") {
+                    showMergeConfirmation = true
+                }
+                .disabled(group.contacts.count < 2)
+            }
+        }
+        .confirmationDialog(
+            "合并后会删除未保留的重复联系人",
+            isPresented: $showMergeConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("合并并删除重复项", role: .destructive) {
+                guard let keeper = group.contacts.first(where: { $0.identifier == keeperID }) else { return }
+                Task {
+                    await manager.merge(group, keeping: keeper)
+                    dismiss()
+                }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("查重依据：\(group.reasonSummary)。请确认这些联系人确实属于同一个人。")
+        }
+        .detailFrameOnMac()
     }
 }
 
@@ -649,12 +810,25 @@ struct ContactRow: View {
 
             if !contact.phoneSummary.isEmpty {
                 Label(contact.phoneSummary, systemImage: "phone")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .detailTextStyle()
             }
-
             if !contact.emailSummary.isEmpty {
                 Label(contact.emailSummary, systemImage: "envelope")
+                    .detailTextStyle()
+            }
+            if !contact.organizationName.isEmpty {
+                Label(contact.organizationName, systemImage: "building.2")
+                    .detailTextStyle()
+            }
+            if !contact.jobTitle.isEmpty {
+                Label(contact.jobTitle, systemImage: "briefcase")
+                    .detailTextStyle()
+            }
+            if contact.phoneSummary.isEmpty,
+               contact.emailSummary.isEmpty,
+               contact.organizationName.isEmpty,
+               contact.jobTitle.isEmpty {
+                Text("没有电话、邮箱或单位资料")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -673,11 +847,25 @@ private extension View {
 #endif
     }
 
+    func detailTextStyle() -> some View {
+        font(.subheadline)
+            .foregroundStyle(.secondary)
+    }
+
     @ViewBuilder
     func mergeReportFrameOnMac() -> some View {
 #if os(macOS)
         frame(width: 520)
             .frame(minHeight: 500)
+#else
+        self
+#endif
+    }
+
+    @ViewBuilder
+    func detailFrameOnMac() -> some View {
+#if os(macOS)
+        frame(minWidth: 560, minHeight: 460)
 #else
         self
 #endif

@@ -6,8 +6,10 @@ ContactsDeduper 是一个使用 SwiftUI 和 Contacts 框架构建的本地通讯
 
 ## 功能
 
+- 首屏按本机、iCloud、Google 等通讯录账户列出容器，进入账户后再独立查重。
 - 扫描姓名、电话号码或邮箱相同的联系人。
 - 展示每组重复联系人的全部判定依据及命中对象。
+- 扫描并合并同一通讯录账户内的同名 List，同时保留全部成员。
 - 手动选择保留项并合并单组联系人。
 - 一键同步合并全部重复项，并显示实时进度。
 - 合并完成后展示统计报告和撒花效果。
@@ -24,6 +26,8 @@ ContactsDeduper 是一个使用 SwiftUI 和 Contacts 框架构建的本地通讯
 3. 姓、名和中间名组合后相同。
 
 匹配关系会进行链式合并。例如 A 与 B 电话相同、B 与 C 姓名相同，三者会进入同一个重复组。系统通讯录中的“家人”“工作”等分组不参与查重。
+
+联系人 List 使用独立规则处理：名称忽略大小写和首尾空格后相同，并且属于同一个 Contacts 容器时，才会显示为可合并。跨 iCloud、Google 或其他账户的同名 List 不会自动合并。
 
 ## 数据安全
 
@@ -64,8 +68,8 @@ xcodebuild -project ContactsDeduper.xcodeproj \
 
 ## 项目结构
 
-- `ContactsDeduper/ContentView.swift`：主界面、导入导出、批量操作和报告。
-- `ContactsDeduper/ContactsManager.swift`：权限、查重、合并、删除和 Contacts 数据访问。
+- `ContactsDeduper/ContentView.swift`：账户路由、账户内查重、导入导出、批量操作和报告。
+- `ContactsDeduper/ContactsManager.swift`：权限、容器级查询、查重、合并、删除和 Contacts 数据访问。
 - `ContactsDeduper/ContactsBackup.swift`：版本化备份模型、校验、编码与恢复。
 - `ContactsDeduper/Info.plist`：iOS 权限与应用配置。
 - `ContactsDeduper/Info-macOS.plist`：macOS 权限与应用配置。

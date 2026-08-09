@@ -12,6 +12,8 @@ ContactsDeduper is a local-first SwiftUI application for iOS and native macOS. I
 - Keep Contacts mutations inside `ContactsManager`, which is isolated to `@MainActor`.
 - Use `CNContactStore`, `CNContactFetchRequest`, and `CNSaveRequest`; do not introduce a parallel contact database.
 - Keep destructive actions behind an explicit confirmation UI.
+- Merge duplicate contact lists only when their normalized names and container identifiers match. Never move list membership across containers or accounts implicitly.
+- Keep duplicate scanning and merging scoped to the account container selected in the UI. Fetch non-unified records for container-scoped mutations.
 - Never make backup import delete or overwrite existing contacts. Import may add missing contacts or restore a missing image.
 - Keep bulk merges atomic by preparing one `CNSaveRequest` before execution whenever possible.
 - Prefer the contact with the highest information score as the automatic merge keeper.

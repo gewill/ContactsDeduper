@@ -29,9 +29,15 @@ struct DuplicateReason: Identifiable {
     let contactIDs: Set<String>
 
     func matchingContactNames(in contacts: [CNContact]) -> String {
-        contacts
-            .filter { contactIDs.contains($0.identifier) }
-            .map(\.displayName)
+        var countsByName: [String: Int] = [:]
+        for contact in contacts where contactIDs.contains(contact.identifier) {
+            countsByName[contact.displayName, default: 0] += 1
+        }
+
+        return countsByName
+            .map { name, count in
+                count == 1 ? name : "\(name)（\(count) 个）"
+            }
             .sorted()
             .joined(separator: "、")
     }
@@ -46,6 +52,36 @@ struct BulkMergeResult: Identifiable {
     let remainingDuplicateGroupCount: Int
     let completedAt: Date
     let duration: TimeInterval
+}
+
+struct ContactAccount: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let typeName: String
+    let contactCount: Int
+}
+
+struct DuplicateContactList: Identifiable {
+    let id: String
+    let name: String
+    let containerName: String
+    let containerIdentifier: String
+    let groups: [CNGroup]
+    let membersByGroupIdentifier: [String: [CNContact]]
+
+    var uniqueMemberCount: Int {
+        Set(membersByGroupIdentifier.values.flatMap { $0.map(\.identifier) }).count
+    }
+
+    var detail: String {
+        "\(groups.count) 个 List · \(uniqueMemberCount) 位联系人"
+    }
+}
+
+struct ContactListBulkMergeResult {
+    let mergedSetCount: Int
+    let deletedListCount: Int
+    let addedMemberCount: Int
 }
 
 extension CNContact {
@@ -75,10 +111,15 @@ private extension String {
 @MainActor
 final class ContactsManager: ObservableObject {
     @Published private(set) var authorizationStatus = CNContactStore.authorizationStatus(for: .contacts)
+    @Published private(set) var contactAccounts: [ContactAccount] = []
+    @Published private(set) var activeAccount: ContactAccount?
     @Published private(set) var allContacts: [CNContact] = []
     @Published private(set) var duplicateGroups: [DuplicateGroup] = []
+    @Published private(set) var duplicateContactLists: [DuplicateContactList] = []
     @Published private(set) var bulkMergeProgress: Double?
     @Published private(set) var bulkMergeStatus: String?
+    @Published private(set) var contactListMergeProgress: Double?
+    @Published private(set) var contactListMergeStatus: String?
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -86,6 +127,14 @@ final class ContactsManager: ObservableObject {
 
     var isBulkMerging: Bool {
         bulkMergeProgress != nil
+    }
+
+    var isBulkMergingContactLists: Bool {
+        contactListMergeProgress != nil
+    }
+
+    var totalContactCount: Int {
+        contactAccounts.reduce(0) { $0 + $1.contactCount }
     }
 
     func requestAccessAndLoad() async {
@@ -103,9 +152,7 @@ final class ContactsManager: ObservableObject {
                 return
             }
 
-            let contacts = try fetchContacts()
-            allContacts = contacts
-            duplicateGroups = findDuplicates(in: contacts)
+            contactAccounts = try fetchContactAccounts()
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -113,7 +160,51 @@ final class ContactsManager: ObservableObject {
     }
 
     func refresh() async {
-        await requestAccessAndLoad()
+        if let activeAccount {
+            await loadAccount(activeAccount)
+        } else {
+            await loadAccounts()
+        }
+    }
+
+    func loadAccounts() async {
+        guard hasContactsAccess else {
+            await requestAccessAndLoad()
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            contactAccounts = try fetchContactAccounts()
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func loadAccount(_ account: ContactAccount) async {
+        guard hasContactsAccess else {
+            await requestAccessAndLoad()
+            return
+        }
+
+        if activeAccount?.id != account.id {
+            allContacts = []
+            duplicateGroups = []
+            duplicateContactLists = []
+        }
+        activeAccount = account
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            try reloadActiveAccount()
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func makeBackupDocument() throws -> ContactsBackupDocument {
@@ -181,9 +272,7 @@ final class ContactsManager: ObservableObject {
             try store.execute(request)
         }
 
-        let contacts = try fetchContacts()
-        allContacts = contacts
-        duplicateGroups = findDuplicates(in: contacts)
+        try refreshVisibleState()
         errorMessage = nil
 
         return ContactImportResult(
@@ -212,14 +301,15 @@ final class ContactsManager: ObservableObject {
         do {
             try store.execute(request)
         } catch {
-            let remainingContacts = try fetchContacts()
-            allContacts = remainingContacts
-            duplicateGroups = findDuplicates(in: remainingContacts)
+            try? refreshVisibleState()
             throw error
         }
 
         allContacts = []
         duplicateGroups = []
+        duplicateContactLists = []
+        activeAccount = nil
+        contactAccounts = try fetchContactAccounts()
         errorMessage = nil
         return contacts.count
     }
@@ -300,10 +390,7 @@ final class ContactsManager: ObservableObject {
         do {
             try store.execute(request)
         } catch {
-            if let remainingContacts = try? fetchContacts() {
-                allContacts = remainingContacts
-                duplicateGroups = findDuplicates(in: remainingContacts)
-            }
+            try? refreshVisibleState()
             throw error
         }
 
@@ -311,19 +398,89 @@ final class ContactsManager: ObservableObject {
         bulkMergeProgress = 0.98
         await Task.yield()
 
-        let contacts = try fetchContacts()
-        allContacts = contacts
-        duplicateGroups = findDuplicates(in: contacts)
+        try reloadActiveAccount()
         errorMessage = nil
 
         return BulkMergeResult(
             mergedGroupCount: groups.count,
             deletedContactCount: deletedContactCount,
             contactCountBefore: contactCountBefore,
-            contactCountAfter: contacts.count,
+            contactCountAfter: allContacts.count,
             remainingDuplicateGroupCount: duplicateGroups.count,
             completedAt: Date(),
             duration: Date().timeIntervalSince(startedAt)
+        )
+    }
+
+    func mergeAllDuplicateContactLists() async throws -> ContactListBulkMergeResult {
+        guard hasContactsAccess else {
+            throw ContactsBackupError.accessDenied
+        }
+
+        let duplicateLists = duplicateContactLists
+        guard !duplicateLists.isEmpty else {
+            return ContactListBulkMergeResult(
+                mergedSetCount: 0,
+                deletedListCount: 0,
+                addedMemberCount: 0
+            )
+        }
+
+        contactListMergeProgress = 0
+        contactListMergeStatus = "正在准备 List 合并"
+        defer {
+            contactListMergeProgress = nil
+            contactListMergeStatus = nil
+        }
+
+        let request = CNSaveRequest()
+        var deletedListCount = 0
+        var addedMemberCount = 0
+
+        for (index, duplicateList) in duplicateLists.enumerated() {
+            guard let keeper = preferredListKeeper(in: duplicateList) else { continue }
+            var keeperMemberIDs = Set(
+                duplicateList.membersByGroupIdentifier[keeper.identifier, default: []]
+                    .map(\.identifier)
+            )
+
+            for group in duplicateList.groups where group.identifier != keeper.identifier {
+                for contact in duplicateList.membersByGroupIdentifier[group.identifier, default: []] {
+                    if keeperMemberIDs.insert(contact.identifier).inserted {
+                        request.addMember(contact, to: keeper)
+                        addedMemberCount += 1
+                    }
+                }
+                request.delete(group.mutableCopy() as! CNMutableGroup)
+                deletedListCount += 1
+            }
+
+            contactListMergeStatus = "正在整理第 \(index + 1) / \(duplicateLists.count) 组 List"
+            contactListMergeProgress = Double(index + 1) / Double(duplicateLists.count) * 0.85
+            await Task.yield()
+        }
+
+        contactListMergeStatus = "正在写入通讯录"
+        contactListMergeProgress = 0.92
+        await Task.yield()
+
+        do {
+            try store.execute(request)
+        } catch {
+            try? refreshVisibleState()
+            throw error
+        }
+
+        contactListMergeStatus = "正在重新扫描"
+        contactListMergeProgress = 0.98
+        await Task.yield()
+        try reloadActiveAccount()
+        errorMessage = nil
+
+        return ContactListBulkMergeResult(
+            mergedSetCount: duplicateLists.count,
+            deletedListCount: deletedListCount,
+            addedMemberCount: addedMemberCount
         )
     }
 
@@ -338,7 +495,7 @@ final class ContactsManager: ObservableObject {
         }
     }
 
-    private func fetchContacts() throws -> [CNContact] {
+    private func fetchContacts(in containerIdentifier: String? = nil) throws -> [CNContact] {
         let keys: [CNKeyDescriptor] = [
             CNContactIdentifierKey as CNKeyDescriptor,
             CNContactTypeKey as CNKeyDescriptor,
@@ -369,15 +526,179 @@ final class ContactsManager: ObservableObject {
             CNContactImageDataKey as CNKeyDescriptor
         ]
 
+        if let containerIdentifier {
+            let predicate = CNContact.predicateForContactsInContainer(
+                withIdentifier: containerIdentifier
+            )
+            let contacts = try fetchNonUnifiedContacts(matching: predicate, keysToFetch: keys)
+            return uniqueContacts(contacts).sorted {
+                $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+            }
+        }
+
         var contacts: [CNContact] = []
+        var seenIdentifiers = Set<String>()
         let request = CNContactFetchRequest(keysToFetch: keys)
         request.sortOrder = .givenName
+        request.unifyResults = true
 
         try store.enumerateContacts(with: request) { contact, _ in
-            contacts.append(contact)
+            if seenIdentifiers.insert(contact.identifier).inserted {
+                contacts.append(contact)
+            }
         }
 
         return contacts
+    }
+
+    private func updateContactState(with contacts: [CNContact], account: ContactAccount) throws {
+        allContacts = contacts
+        duplicateGroups = findDuplicates(in: contacts)
+        duplicateContactLists = try fetchDuplicateContactLists(in: account)
+    }
+
+    private func fetchDuplicateContactLists(in account: ContactAccount) throws -> [DuplicateContactList] {
+        var duplicates: [DuplicateContactList] = []
+        let memberKeys = [CNContactIdentifierKey as CNKeyDescriptor]
+
+        let groupPredicate = CNGroup.predicateForGroupsInContainer(withIdentifier: account.id)
+        let groups = try store.groups(matching: groupPredicate)
+        let groupsByName = Dictionary(grouping: groups) { normalizeListName($0.name) }
+
+        for (normalizedName, matchingGroups) in groupsByName {
+            guard !normalizedName.isEmpty, matchingGroups.count > 1 else { continue }
+
+            var membersByGroupIdentifier: [String: [CNContact]] = [:]
+            for group in matchingGroups {
+                let memberPredicate = CNContact.predicateForContactsInGroup(
+                    withIdentifier: group.identifier
+                )
+                membersByGroupIdentifier[group.identifier] = try fetchNonUnifiedContacts(
+                    matching: memberPredicate,
+                    keysToFetch: memberKeys
+                )
+            }
+
+            let displayName = matchingGroups
+                .map { $0.name.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .sorted()
+                .first ?? normalizedName
+            duplicates.append(
+                DuplicateContactList(
+                    id: "\(account.id)|\(normalizedName)",
+                    name: displayName,
+                    containerName: account.name,
+                    containerIdentifier: account.id,
+                    groups: matchingGroups,
+                    membersByGroupIdentifier: membersByGroupIdentifier
+                )
+            )
+        }
+
+        return duplicates.sorted {
+            if $0.groups.count == $1.groups.count {
+                if $0.name == $1.name {
+                    return $0.containerName < $1.containerName
+                }
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+            return $0.groups.count > $1.groups.count
+        }
+    }
+
+    private func fetchContactAccounts() throws -> [ContactAccount] {
+        let containers = try store.containers(matching: nil)
+        let identifierKey = [CNContactIdentifierKey as CNKeyDescriptor]
+
+        return try containers.map { container in
+            let predicate = CNContact.predicateForContactsInContainer(
+                withIdentifier: container.identifier
+            )
+            let contacts = try fetchNonUnifiedContacts(
+                matching: predicate,
+                keysToFetch: identifierKey
+            )
+            let trimmedName = container.name.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            return ContactAccount(
+                id: container.identifier,
+                name: trimmedName.isEmpty ? containerTypeName(container.type) : trimmedName,
+                typeName: containerTypeName(container.type),
+                contactCount: Set(contacts.map(\.identifier)).count
+            )
+        }
+        .sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    private func reloadActiveAccount() throws {
+        guard let activeAccount else { return }
+        let contacts = try fetchContacts(in: activeAccount.id)
+        let refreshedAccount = ContactAccount(
+            id: activeAccount.id,
+            name: activeAccount.name,
+            typeName: activeAccount.typeName,
+            contactCount: contacts.count
+        )
+        self.activeAccount = refreshedAccount
+        if let index = contactAccounts.firstIndex(where: { $0.id == refreshedAccount.id }) {
+            contactAccounts[index] = refreshedAccount
+        }
+        try updateContactState(with: contacts, account: refreshedAccount)
+    }
+
+    private func refreshVisibleState() throws {
+        contactAccounts = try fetchContactAccounts()
+        if let activeAccount,
+           let refreshedAccount = contactAccounts.first(where: { $0.id == activeAccount.id }) {
+            self.activeAccount = refreshedAccount
+            try reloadActiveAccount()
+        } else {
+            activeAccount = nil
+            allContacts = []
+            duplicateGroups = []
+            duplicateContactLists = []
+        }
+    }
+
+    private func uniqueContacts(_ contacts: [CNContact]) -> [CNContact] {
+        var seenIdentifiers = Set<String>()
+        return contacts.filter { seenIdentifiers.insert($0.identifier).inserted }
+    }
+
+    private func fetchNonUnifiedContacts(
+        matching predicate: NSPredicate,
+        keysToFetch: [CNKeyDescriptor]
+    ) throws -> [CNContact] {
+        let request = CNContactFetchRequest(keysToFetch: keysToFetch)
+        request.predicate = predicate
+        request.unifyResults = false
+
+        var contacts: [CNContact] = []
+        try store.enumerateContacts(with: request) { contact, _ in
+            contacts.append(contact)
+        }
+        return contacts
+    }
+
+    private func containerTypeName(_ type: CNContainerType) -> String {
+        switch type {
+        case .local:
+            return "本机"
+        case .exchange:
+            return "Exchange"
+        case .cardDAV:
+            return "CardDAV"
+        case .unassigned:
+            return "其他账户"
+        @unknown default:
+            return "其他账户"
+        }
+    }
+
+    private func normalizeListName(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private func countContactsToAdd(
@@ -494,18 +815,66 @@ final class ContactsManager: ObservableObject {
             let contacts = ids.compactMap { byID[$0] }.sorted { $0.displayName < $1.displayName }
             guard contacts.count > 1 else { return nil }
             return DuplicateGroup(
-                id: rootID,
+                id: stableGroupID(for: ids),
                 reasons: reasonsByRoot[rootID, default: []],
                 contacts: contacts
             )
         }
 
-        return groups.sorted {
+        return uniqueDuplicateGroups(groups).sorted {
             if $0.contacts.count == $1.contacts.count {
                 return $0.displayName < $1.displayName
             }
             return $0.contacts.count > $1.contacts.count
         }
+    }
+
+    private func uniqueDuplicateGroups(_ groups: [DuplicateGroup]) -> [DuplicateGroup] {
+        var groupsByMembership: [String: DuplicateGroup] = [:]
+
+        for group in groups {
+            let contactIDs = Set(group.contacts.map(\.identifier))
+            let membershipKey = stableGroupID(for: contactIDs)
+
+            guard let existing = groupsByMembership[membershipKey] else {
+                groupsByMembership[membershipKey] = DuplicateGroup(
+                    id: membershipKey,
+                    reasons: uniqueReasons(group.reasons),
+                    contacts: group.contacts
+                )
+                continue
+            }
+
+            groupsByMembership[membershipKey] = DuplicateGroup(
+                id: membershipKey,
+                reasons: uniqueReasons(existing.reasons + group.reasons),
+                contacts: existing.contacts
+            )
+        }
+
+        return Array(groupsByMembership.values)
+    }
+
+    private func uniqueReasons(_ reasons: [DuplicateReason]) -> [DuplicateReason] {
+        var reasonsByID: [String: DuplicateReason] = [:]
+
+        for reason in reasons {
+            if let existing = reasonsByID[reason.id] {
+                reasonsByID[reason.id] = DuplicateReason(
+                    id: reason.id,
+                    description: existing.description,
+                    contactIDs: existing.contactIDs.union(reason.contactIDs)
+                )
+            } else {
+                reasonsByID[reason.id] = reason
+            }
+        }
+
+        return reasonsByID.values.sorted { $0.id < $1.id }
+    }
+
+    private func stableGroupID(for contactIDs: Set<String>) -> String {
+        contactIDs.sorted().joined(separator: "|")
     }
 
     private func mergeValues(from contact: CNContact, into keeper: CNMutableContact) {
@@ -583,6 +952,17 @@ final class ContactsManager: ObservableObject {
                 return first.identifier > second.identifier
             }
             return firstScore < secondScore
+        }
+    }
+
+    private func preferredListKeeper(in duplicateList: DuplicateContactList) -> CNGroup? {
+        duplicateList.groups.max { first, second in
+            let firstCount = duplicateList.membersByGroupIdentifier[first.identifier]?.count ?? 0
+            let secondCount = duplicateList.membersByGroupIdentifier[second.identifier]?.count ?? 0
+            if firstCount == secondCount {
+                return first.identifier > second.identifier
+            }
+            return firstCount < secondCount
         }
     }
 
