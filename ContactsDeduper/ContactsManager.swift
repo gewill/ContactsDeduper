@@ -112,6 +112,19 @@ enum DuplicateMatchRule: String, CaseIterable, Identifiable {
         }
     }
 
+    var shortTitle: String {
+        switch self {
+        case .dual:
+            return "两项"
+        case .any:
+            return "任一项"
+        case .nameOnly:
+            return "仅名字"
+        case .phoneOnly:
+            return "仅电话"
+        }
+    }
+
     var detail: String {
         switch self {
         case .dual:
@@ -155,7 +168,7 @@ struct BulkMergePlanItem: Identifiable {
     }
 
     var additionSummary: String {
-        additions.isEmpty ? "无新增资料" : additions.joined(separator: " · ")
+        additions.isEmpty ? "无新增资料" : "补齐 \(additions.joined(separator: " · "))"
     }
 }
 

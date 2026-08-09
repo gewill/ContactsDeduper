@@ -291,12 +291,13 @@ private struct AccountDuplicatesView: View {
                 resultsList
             }
         }
+        .safeAreaInset(edge: .top) {
+            matchRuleBar
+        }
         .navigationTitle(account.name)
         .inlineNavigationTitleOnIOS()
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                matchRuleMenu
-
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     Task { await manager.loadAccount(account) }
                 } label: {
@@ -344,19 +345,31 @@ private struct AccountDuplicatesView: View {
         manager.isBulkMerging || manager.isBulkMergingContactLists
     }
 
-    private var matchRuleMenu: some View {
-        Menu {
+    private var matchRuleBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("账户内查重", systemImage: "sparkle.magnifyingglass")
+                Spacer()
+                Text("共 \(manager.allContacts.count) 人")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.subheadline.weight(.medium))
+
             Picker("判定标准", selection: matchRuleBinding) {
                 ForEach(DuplicateMatchRule.allCases) { rule in
-                    Text(rule.title).tag(rule)
+                    Text(rule.shortTitle).tag(rule)
                 }
             }
-            .pickerStyle(.inline)
-        } label: {
-            Image(systemName: "slider.horizontal.3")
+            .pickerStyle(.segmented)
+            .disabled(isMerging || manager.isLoading)
+
+            Text(manager.matchRule.detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .accessibilityLabel("重复判定标准，当前为\(manager.matchRule.title)")
-        .disabled(isMerging)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.bar)
     }
 
     private var matchRuleBinding: Binding<DuplicateMatchRule> {
@@ -454,24 +467,6 @@ private struct AccountDuplicatesView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Label("账户内查重", systemImage: "sparkle.magnifyingglass")
-                    Spacer()
-                    Text("共 \(manager.allContacts.count) 人")
-                        .foregroundStyle(.secondary)
-                }
-                .font(.subheadline.weight(.medium))
-
-                Text("判定标准：\(manager.matchRule.title) — \(manager.matchRule.detail)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(.bar)
-        }
         .disabled(isMerging)
     }
 
@@ -479,18 +474,12 @@ private struct AccountDuplicatesView: View {
         ContentUnavailableView {
             Label("这个账户没有重复项", systemImage: "checkmark.seal")
         } description: {
-            Text("已扫描“\(account.name)”中的 \(manager.allContacts.count) 个联系人和 List。当前判定标准为“\(manager.matchRule.title)”，即\(manager.matchRule.detail)。")
+            Text("已扫描“\(account.name)”中的 \(manager.allContacts.count) 个联系人和 List。可在上方切换判定标准，放宽后可能找出更多重复项。")
         } actions: {
             Button("重新扫描") {
                 Task { await manager.loadAccount(account) }
             }
             .buttonStyle(.borderedProminent)
-
-            if manager.matchRule != .any {
-                Button("放宽为任一项相同") {
-                    manager.setMatchRule(.any)
-                }
-            }
         }
     }
 
@@ -686,7 +675,7 @@ private struct BulkMergePreviewView: View {
                 .font(.subheadline)
                 .foregroundStyle(.red)
 
-                Label("补齐 \(item.additionSummary)", systemImage: "plus.circle")
+                Label(item.additionSummary, systemImage: "plus.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
