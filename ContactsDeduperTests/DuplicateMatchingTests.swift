@@ -192,6 +192,102 @@ final class DuplicateMatchingTests: XCTestCase {
         XCTAssertEqual(manager.findDuplicates(in: contacts, rule: .nameOnly).count, 1)
     }
 
+    // MARK: - Multi-valued phone and email fields
+
+    func testMatchesOnASecondaryPhoneNotJustTheFirst() {
+        let contacts = [
+            makeContact(given: "三", family: "张", phones: ["5550000001", "5550000002"]),
+            makeContact(given: "四", family: "李", phones: ["5550000009", "5550000002"])
+        ]
+        XCTAssertEqual(manager.findDuplicates(in: contacts, rule: .phoneOnly).count, 1)
+    }
+
+    func testMatchesOnASecondaryEmailNotJustTheFirst() {
+        let contacts = [
+            makeContact(given: "三", family: "张", emails: ["a@x.com", "shared@x.com"]),
+            makeContact(given: "四", family: "李", emails: ["b@x.com", "shared@x.com"])
+        ]
+        XCTAssertEqual(manager.findDuplicates(in: contacts, rule: .any).count, 1)
+    }
+
+    func testDualRuleCombinesEvidenceFromDifferentFieldKinds() {
+        // Different names, but a secondary phone and a secondary email both line up.
+        let contacts = [
+            makeContact(
+                given: "三", family: "张",
+                phones: ["5550000001", "5550000002"],
+                emails: ["a@x.com", "shared@x.com"]
+            ),
+            makeContact(
+                given: "四", family: "李",
+                phones: ["5550000009", "5550000002"],
+                emails: ["b@x.com", "shared@x.com"]
+            )
+        ]
+        XCTAssertEqual(manager.findDuplicates(in: contacts, rule: .dual).count, 1)
+    }
+
+    func testTwoSharedPhonesAreStillOnlyOneKindOfEvidence() {
+        // "两项" counts kinds of evidence, not matches: sharing two numbers is still
+        // just "phone". Change this only if the rule itself is redefined.
+        let contacts = [
+            makeContact(given: "三", family: "张", phones: ["5550000001", "5550000002"]),
+            makeContact(given: "四", family: "李", phones: ["5550000001", "5550000002"])
+        ]
+        XCTAssertTrue(manager.findDuplicates(in: contacts, rule: .dual).isEmpty)
+        XCTAssertEqual(manager.findDuplicates(in: contacts, rule: .any).count, 1)
+    }
+
+    func testRepeatedNumberOnOneContactIsNotSelfEvidence() {
+        let contacts = [makeContact(given: "三", family: "张", phones: ["5550000001", "5550000001"])]
+        XCTAssertTrue(manager.findDuplicates(in: contacts, rule: .phoneOnly).isEmpty)
+        XCTAssertTrue(manager.findDuplicates(in: contacts, rule: .any).isEmpty)
+    }
+
+    func testAContactWithTwoNumbersChainsTwoOthersIntoOneGroup() {
+        let contacts = [
+            makeContact(given: "甲", family: "王", phones: ["5550000001", "5550000002"]),
+            makeContact(given: "乙", family: "王", phones: ["5550000001"]),
+            makeContact(given: "丙", family: "王", phones: ["5550000002"])
+        ]
+        let groups = manager.findDuplicates(in: contacts, rule: .phoneOnly)
+
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups.first?.contacts.count, 3)
+    }
+
+    func testEverySharedValueProducesItsOwnReason() {
+        let contacts = [
+            makeContact(given: "三", family: "张", phones: ["5550000001", "5550000002"]),
+            makeContact(given: "三", family: "张", phones: ["5550000001", "5550000002"])
+        ]
+        let reasons = manager
+            .findDuplicates(in: contacts, rule: .dual)
+            .flatMap(\.reasons)
+            .map(\.description)
+            .sorted()
+
+        XCTAssertEqual(reasons, ["相同姓名 张三", "相同电话 5550000001", "相同电话 5550000002"])
+    }
+
+    func testLabelsDoNotAffectMatching() {
+        let home = CNMutableContact()
+        home.givenName = "三"
+        home.familyName = "张"
+        home.phoneNumbers = [
+            CNLabeledValue(label: CNLabelHome, value: CNPhoneNumber(stringValue: "5550000001"))
+        ]
+        let work = CNMutableContact()
+        work.givenName = "四"
+        work.familyName = "李"
+        work.phoneNumbers = [
+            CNLabeledValue(label: CNLabelWork, value: CNPhoneNumber(stringValue: "555-000-0001"))
+        ]
+
+        let contacts = [home.copy() as! CNContact, work.copy() as! CNContact]
+        XCTAssertEqual(manager.findDuplicates(in: contacts, rule: .phoneOnly).count, 1)
+    }
+
     // MARK: - Phone normalization
 
     func testNANPCountryCodeIsStripped() {

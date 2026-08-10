@@ -12,6 +12,7 @@
 		1C1C1C1C1C1C1C1C1C1C1C1C /* ContactsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2C2C2C2C2C2C2C2C2C2C2C /* ContactsManager.swift */; };
 		1D1D1D1D1D1D1D1D1D1D1D1D /* ContactsBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */; };
 		CC0000000000000000000001 /* DuplicateMatchingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000010 /* DuplicateMatchingTests.swift */; };
+		CC0000000000000000000004 /* DuplicateMatchingPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000012 /* DuplicateMatchingPerformanceTests.swift */; };
 		CC0000000000000000000002 /* ContactsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2C2C2C2C2C2C2C2C2C2C2C /* ContactsManager.swift */; };
 		CC0000000000000000000003 /* ContactsBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */; };
 /* End PBXBuildFile section */
@@ -23,6 +24,7 @@
 		2E2E2E2E2E2E2E2E2E2E2E2E /* ContactsDeduper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ContactsDeduper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsBackup.swift; sourceTree = "<group>"; };
 		CC0000000000000000000010 /* DuplicateMatchingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateMatchingTests.swift; sourceTree = "<group>"; };
+		CC0000000000000000000012 /* DuplicateMatchingPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateMatchingPerformanceTests.swift; sourceTree = "<group>"; };
 		CC0000000000000000000011 /* ContactsDeduperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ContactsDeduperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -77,6 +79,7 @@
 			isa = PBXGroup;
 			children = (
 				CC0000000000000000000010 /* DuplicateMatchingTests.swift */,
+				CC0000000000000000000012 /* DuplicateMatchingPerformanceTests.swift */,
 			);
 			path = ContactsDeduperTests;
 			sourceTree = "<group>";
@@ -189,6 +192,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CC0000000000000000000001 /* DuplicateMatchingTests.swift in Sources */,
+				CC0000000000000000000004 /* DuplicateMatchingPerformanceTests.swift in Sources */,
 				CC0000000000000000000002 /* ContactsManager.swift in Sources */,
 				CC0000000000000000000003 /* ContactsBackup.swift in Sources */,
 			);

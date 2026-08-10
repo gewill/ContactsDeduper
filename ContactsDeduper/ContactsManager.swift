@@ -676,9 +676,7 @@ final class ContactsManager: ObservableObject {
                 withIdentifier: containerIdentifier
             )
             let contacts = try fetchNonUnifiedContacts(matching: predicate, keysToFetch: keys)
-            return uniqueContacts(contacts).sorted {
-                $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
-            }
+            return sortedByDisplayName(uniqueContacts(contacts))
         }
 
         var contacts: [CNContact] = []
@@ -839,6 +837,16 @@ final class ContactsManager: ObservableObject {
         }
     }
 
+    /// Formats each name once instead of once per comparison. Calling `displayName`
+    /// straight from the comparator runs `CNContactFormatter` O(n log n) times, which
+    /// on its own costs more than the whole rest of a scan.
+    private nonisolated func sortedByDisplayName(_ contacts: [CNContact]) -> [CNContact] {
+        contacts
+            .map { (name: $0.displayName, contact: $0) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            .map(\.contact)
+    }
+
     private nonisolated func uniqueContacts(_ contacts: [CNContact]) -> [CNContact] {
         var seenIdentifiers = Set<String>()
         return contacts.filter { seenIdentifiers.insert($0.identifier).inserted }
@@ -921,9 +929,13 @@ final class ContactsManager: ObservableObject {
         var byID: [String: CNContact] = [:]
         var reasonByKey: [String: String] = [:]
         var kindByKey: [String: DuplicateMatchKind] = [:]
+        // Format each name once; the sorts below reuse it instead of running
+        // CNContactFormatter again on every comparison.
+        var displayNames: [String: String] = [:]
 
         for contact in contacts {
             byID[contact.identifier] = contact
+            displayNames[contact.identifier] = contact.displayName
 
             let phones = contact.phoneNumbers
                 .map { normalizePhone($0.value.stringValue) }
@@ -945,7 +957,7 @@ final class ContactsManager: ObservableObject {
                 kindByKey[key] = .email
             }
 
-            if let nameSignal = nameSignal(for: contact) {
+            if let nameSignal = nameSignal(for: contact, displayName: displayNames[contact.identifier]) {
                 let key = "name:\(nameSignal.key)"
                 buckets[key, default: []].insert(contact.identifier)
                 reasonByKey[key] = nameSignal.description
@@ -1029,8 +1041,14 @@ final class ContactsManager: ObservableObject {
             }
         }
 
+        func displayName(of identifier: String) -> String {
+            displayNames[identifier] ?? ""
+        }
+
         let groups = groupedIDs.compactMap { rootID, ids -> DuplicateGroup? in
-            let contacts = ids.compactMap { byID[$0] }.sorted { $0.displayName < $1.displayName }
+            let contacts = ids
+                .compactMap { byID[$0] }
+                .sorted { displayName(of: $0.identifier) < displayName(of: $1.identifier) }
             guard contacts.count > 1 else { return nil }
             return DuplicateGroup(
                 id: stableGroupID(for: ids),
@@ -1039,12 +1057,15 @@ final class ContactsManager: ObservableObject {
             )
         }
 
-        return groups.sorted {
-            if $0.contacts.count == $1.contacts.count {
-                return $0.displayName < $1.displayName
+        return groups
+            .map { (name: $0.contacts.first.map { displayName(of: $0.identifier) } ?? "", group: $0) }
+            .sorted { first, second in
+                if first.group.contacts.count == second.group.contacts.count {
+                    return first.name < second.name
+                }
+                return first.group.contacts.count > second.group.contacts.count
             }
-            return $0.contacts.count > $1.contacts.count
-        }
+            .map(\.group)
     }
 
     nonisolated private func stableGroupID(for contactIDs: Set<String>) -> String {
@@ -1260,12 +1281,15 @@ final class ContactsManager: ObservableObject {
     /// *not* an extra signal for contacts that do have a person name: colleagues
     /// legitimately share an employer, and pairing that with a shared switchboard
     /// number would merge two different people.
-    nonisolated func nameSignal(for contact: CNContact) -> (key: String, description: String)? {
+    nonisolated func nameSignal(
+        for contact: CNContact,
+        displayName: String? = nil
+    ) -> (key: String, description: String)? {
         let personName = [contact.familyName, contact.givenName, contact.middleName]
             .joined()
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if !personName.isEmpty {
-            return (personName.lowercased(), "相同姓名 \(contact.displayName)")
+            return (personName.lowercased(), "相同姓名 \(displayName ?? contact.displayName)")
         }
 
         let organizationName = contact.organizationName
