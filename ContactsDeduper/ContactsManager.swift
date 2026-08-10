@@ -84,6 +84,26 @@ struct ContactListBulkMergeResult {
     let addedMemberCount: Int
 }
 
+/// Contacts authorization, reduced to the states the UI has to speak to.
+enum ContactsPermissionState {
+    case granted
+    /// iOS 18+ "limited access": only the contacts the user hand-picked are visible,
+    /// so every count and every "no duplicates" verdict covers a subset.
+    case limited
+    case notDetermined
+    case denied
+    case restricted
+
+    var allowsAccess: Bool {
+        self == .granted || self == .limited
+    }
+
+    /// Whether the user can fix this themselves in system settings.
+    var isFixableInSettings: Bool {
+        self == .denied || self == .limited
+    }
+}
+
 enum DuplicateMatchKind: String {
     case name
     case phone
@@ -259,15 +279,37 @@ final class ContactsManager: ObservableObject {
                 authorizationStatus = CNContactStore.authorizationStatus(for: .contacts)
             }
 
-            guard hasContactsAccess else {
-                errorMessage = "请在系统设置中允许访问通讯录。"
-                return
-            }
+            // No alert here: the permission screen states the problem and offers a
+            // way out, and an alert saying the same thing just has to be dismissed.
+            guard hasContactsAccess else { return }
 
             contactAccounts = try await loadContactAccounts()
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Re-reads the system setting, which can change while the app sits in the
+    /// background — on macOS the user can flip it without the app restarting.
+    func refreshAuthorizationStatus() async {
+        let latest = CNContactStore.authorizationStatus(for: .contacts)
+        let changed = latest != authorizationStatus
+        authorizationStatus = latest
+
+        guard hasContactsAccess else {
+            if changed {
+                contactAccounts = []
+                activeAccount = nil
+                allContacts = []
+                duplicateGroups = []
+                duplicateContactLists = []
+            }
+            return
+        }
+
+        if changed || contactAccounts.isEmpty {
+            await loadAccounts()
         }
     }
 
@@ -907,16 +949,33 @@ final class ContactsManager: ObservableObject {
         return additions
     }
 
-    private var hasContactsAccess: Bool {
-        if authorizationStatus == .authorized {
-            return true
-        }
+    /// The system status folded into the cases the UI actually has to guide.
+    nonisolated static func permissionState(for status: CNAuthorizationStatus) -> ContactsPermissionState {
 #if os(iOS)
-        if #available(iOS 18.0, *), authorizationStatus == .limited {
-            return true
+        if #available(iOS 18.0, *), status == .limited {
+            return .limited
         }
 #endif
-        return false
+        switch status {
+        case .authorized:
+            return .granted
+        case .notDetermined:
+            return .notDetermined
+        case .restricted:
+            return .restricted
+        default:
+            // Anything else, including a case added by a future OS, is treated as
+            // "no access" so the user is offered a way to fix it.
+            return .denied
+        }
+    }
+
+    var permissionState: ContactsPermissionState {
+        Self.permissionState(for: authorizationStatus)
+    }
+
+    private var hasContactsAccess: Bool {
+        permissionState.allowsAccess
     }
 
     /// Pure and actor-independent: it only reads the contacts handed to it, so tests

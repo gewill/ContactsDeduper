@@ -294,6 +294,49 @@ final class ContactMergeTests: XCTestCase {
         XCTAssertEqual(manager.countContactsToAdd(incoming, comparedWith: existing), 0)
     }
 
+    // MARK: - Permission state
+
+    func testAuthorizedMapsToGrantedAccess() {
+        let state = ContactsManager.permissionState(for: .authorized)
+        XCTAssertEqual(state, .granted)
+        XCTAssertTrue(state.allowsAccess)
+        XCTAssertFalse(state.isFixableInSettings)
+    }
+
+    func testDeniedIsFixableInSettings() {
+        let state = ContactsManager.permissionState(for: .denied)
+        XCTAssertEqual(state, .denied)
+        XCTAssertFalse(state.allowsAccess)
+        XCTAssertTrue(state.isFixableInSettings)
+    }
+
+    func testRestrictedCannotBeFixedByTheUser() {
+        // Screen Time or an MDM profile: pointing at Settings would be a dead end.
+        let state = ContactsManager.permissionState(for: .restricted)
+        XCTAssertEqual(state, .restricted)
+        XCTAssertFalse(state.allowsAccess)
+        XCTAssertFalse(state.isFixableInSettings)
+    }
+
+    func testNotDeterminedIsNeitherAccessNorASettingsProblem() {
+        let state = ContactsManager.permissionState(for: .notDetermined)
+        XCTAssertEqual(state, .notDetermined)
+        XCTAssertFalse(state.allowsAccess)
+        XCTAssertFalse(state.isFixableInSettings)
+    }
+
+    #if os(iOS)
+    @available(iOS 18.0, *)
+    func testLimitedAllowsAccessButStillPromptsForMore() {
+        // Limited access works, so the app proceeds — but only over the contacts the
+        // user picked, which is why it stays "fixable" and the UI keeps nagging.
+        let state = ContactsManager.permissionState(for: .limited)
+        XCTAssertEqual(state, .limited)
+        XCTAssertTrue(state.allowsAccess)
+        XCTAssertTrue(state.isFixableInSettings)
+    }
+    #endif
+
     // MARK: - Group presentation
 
     func testGroupSummarisesASingleReasonVerbatim() {

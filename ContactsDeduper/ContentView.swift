@@ -2,9 +2,30 @@ import Contacts
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
+
+/// Opens the place where Contacts access can be granted: the app's own settings page
+/// on iOS, the Privacy & Security pane on macOS, which has no per-app page.
+@MainActor
+func openContactsPrivacySettings() {
+#if os(iOS)
+    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+    UIApplication.shared.open(url)
+#elseif os(macOS)
+    guard let url = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts"
+    ) else { return }
+    NSWorkspace.shared.open(url)
+#endif
+}
 
 struct ContentView: View {
     @StateObject private var manager = ContactsManager()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var exportDocument = ContactsBackupDocument()
     @State private var exportedContactCount = 0
     @State private var isExporting = false
@@ -19,7 +40,7 @@ struct ContentView: View {
             Group {
                 if manager.isLoading && manager.contactAccounts.isEmpty {
                     ProgressView("正在加载通讯录账户")
-                } else if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted {
+                } else if !manager.permissionState.allowsAccess {
                     permissionView
                 } else if manager.contactAccounts.isEmpty {
                     emptyView
@@ -43,6 +64,12 @@ struct ContentView: View {
             }
             .task {
                 await manager.requestAccessAndLoad()
+            }
+            // The setting can be flipped while the app is in the background, so pick
+            // the change up on return instead of making the user relaunch.
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await manager.refreshAuthorizationStatus() }
             }
             .alert("提示", isPresented: Binding(
                 get: { manager.errorMessage != nil },
@@ -117,6 +144,12 @@ struct ContentView: View {
 
     private var accountList: some View {
         List {
+            if manager.permissionState == .limited {
+                Section {
+                    LimitedAccessNotice()
+                }
+            }
+
             Section("账户") {
                 ForEach(manager.contactAccounts) { account in
                     NavigationLink {
@@ -285,10 +318,59 @@ struct ContentView: View {
 
     private var permissionView: some View {
         ContentUnavailableView {
-            Label("需要通讯录权限", systemImage: "person.crop.circle.badge.exclamationmark")
+            Label(permissionTitle, systemImage: "person.crop.circle.badge.exclamationmark")
         } description: {
-            Text("打开系统设置，为 ContactsDeduper 启用通讯录访问权限。")
+            Text(permissionDescription)
+        } actions: {
+            switch manager.permissionState {
+            case .notDetermined:
+                Button("允许访问通讯录") {
+                    Task { await manager.requestAccessAndLoad() }
+                }
+                .buttonStyle(.borderedProminent)
+
+            case .denied:
+                Button("打开系统设置") {
+                    openContactsPrivacySettings()
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("我已开启，重新检查") {
+                    Task { await manager.refreshAuthorizationStatus() }
+                }
+
+            case .restricted, .granted, .limited:
+                EmptyView()
+            }
         }
+    }
+
+    private var permissionTitle: String {
+        switch manager.permissionState {
+        case .restricted:
+            return "通讯录访问被限制"
+        default:
+            return "需要通讯录权限"
+        }
+    }
+
+    private var permissionDescription: String {
+        switch manager.permissionState {
+        case .notDetermined:
+            return "ContactsDeduper 需要读取通讯录才能查找重复联系人。全部处理都在本机完成，不会上传。"
+        case .restricted:
+            return "屏幕使用时间或设备管理配置禁止访问通讯录，需要由管理者解除限制，在设置中打开开关无效。"
+        default:
+            return settingsPathHint
+        }
+    }
+
+    private var settingsPathHint: String {
+#if os(iOS)
+        return "通讯录访问已被拒绝。前往「设置 › ContactsDeduper › 通讯录」打开开关，回到应用后会自动重新扫描。"
+#else
+        return "通讯录访问已被拒绝。前往「系统设置 › 隐私与安全性 › 通讯录」勾选 ContactsDeduper，回到应用后会自动重新扫描。"
+#endif
     }
 }
 
@@ -561,6 +643,31 @@ private struct DedupSectionHeader: View {
             .disabled(isDisabled)
         }
         .textCase(nil)
+    }
+}
+
+/// Limited access hands the app only the contacts the user hand-picked. Every count
+/// and every "no duplicates" verdict then covers a subset, which for a deduper is
+/// misleading enough to say out loud rather than hide.
+private struct LimitedAccessNotice: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("仅可访问部分联系人", systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.orange)
+
+            Text("你只授权了部分联系人。下面的数量和查重结果都只覆盖这一部分，未授权的联系人不会被扫描，也不会被合并或删除。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button("授予完整通讯录权限") {
+                openContactsPrivacySettings()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .contain)
     }
 }
 
