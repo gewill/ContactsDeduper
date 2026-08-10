@@ -78,11 +78,30 @@ xcodebuild -project ContactsDeduper.xcodeproj \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
+## 单元测试
+
+查重规则由 `ContactsDeduperTests` 覆盖。测试直接调用 `findDuplicates(in:rule:)`，只读传入的联系人对象，不访问 `CNContactStore`，因此不需要通讯录权限，也不会启动 App（测试包刻意不设 `TEST_HOST`）。
+
+```bash
+xcodebuild test -project ContactsDeduper.xcodeproj \
+  -scheme ContactsDeduper \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+```bash
+xcodebuild test -project ContactsDeduper.xcodeproj \
+  -scheme ContactsDeduper \
+  -destination 'platform=macOS,arch=arm64' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
 ## 项目结构
 
 - `ContactsDeduper/ContentView.swift`：账户路由、账户内查重、导入导出、批量操作和报告。
 - `ContactsDeduper/ContactsManager.swift`：权限、容器级查询、查重、合并、删除和 Contacts 数据访问。
 - `ContactsDeduper/ContactsBackup.swift`：版本化备份模型、校验、编码与恢复。
+- `ContactsDeduperTests/DuplicateMatchingTests.swift`：判定标准、依据归属、公司名回退与电话规范化的测试。
 - `ContactsDeduper/Info.plist`：iOS 权限与应用配置。
 - `ContactsDeduper/Info-macOS.plist`：macOS 权限与应用配置。
 

@@ -317,7 +317,7 @@ final class ContactsManager: ObservableObject {
         guard rule != matchRule else { return }
         matchRule = rule
         UserDefaults.standard.set(rule.rawValue, forKey: Self.matchRuleDefaultsKey)
-        duplicateGroups = findDuplicates(in: allContacts)
+        duplicateGroups = findDuplicates(in: allContacts, rule: rule)
     }
 
     func makeBackupDocument() throws -> ContactsBackupDocument {
@@ -686,7 +686,7 @@ final class ContactsManager: ObservableObject {
 
     private func updateContactState(with contacts: [CNContact], account: ContactAccount) throws {
         allContacts = contacts
-        duplicateGroups = findDuplicates(in: contacts)
+        duplicateGroups = findDuplicates(in: contacts, rule: matchRule)
         duplicateContactLists = try fetchDuplicateContactLists(in: account)
     }
 
@@ -867,7 +867,12 @@ final class ContactsManager: ObservableObject {
         return false
     }
 
-    private func findDuplicates(in contacts: [CNContact]) -> [DuplicateGroup] {
+    /// Pure and actor-independent: it only reads the contacts handed to it, so tests
+    /// can call it directly and scans can run off the main actor.
+    nonisolated func findDuplicates(
+        in contacts: [CNContact],
+        rule: DuplicateMatchRule
+    ) -> [DuplicateGroup] {
         var buckets: [String: Set<String>] = [:]
         var byID: [String: CNContact] = [:]
         var reasonByKey: [String: String] = [:]
@@ -904,7 +909,7 @@ final class ContactsManager: ObservableObject {
             }
         }
 
-        let consideredKinds = matchRule.consideredKinds
+        let consideredKinds = rule.consideredKinds
         let candidateBuckets = buckets.filter { key, ids in
             guard ids.count > 1, let kind = kindByKey[key] else { return false }
             return consideredKinds.contains(kind)
@@ -926,7 +931,7 @@ final class ContactsManager: ObservableObject {
             }
         }
 
-        if matchRule.requiredMatchCount > 1 {
+        if rule.requiredMatchCount > 1 {
             // A shared bucket is only one piece of evidence, so tally the kinds of
             // evidence per contact pair and link a pair only once it clears the bar.
             var kindsByPair: [ContactPair: Set<DuplicateMatchKind>] = [:]
@@ -944,7 +949,7 @@ final class ContactsManager: ObservableObject {
                 }
             }
 
-            for (pair, kinds) in kindsByPair where kinds.count >= matchRule.requiredMatchCount {
+            for (pair, kinds) in kindsByPair where kinds.count >= rule.requiredMatchCount {
                 union(pair.first, pair.second)
             }
         } else {
@@ -998,7 +1003,7 @@ final class ContactsManager: ObservableObject {
         }
     }
 
-    private func stableGroupID(for contactIDs: Set<String>) -> String {
+    nonisolated private func stableGroupID(for contactIDs: Set<String>) -> String {
         contactIDs.sorted().joined(separator: "|")
     }
 
@@ -1194,7 +1199,7 @@ final class ContactsManager: ObservableObject {
         return result
     }
 
-    private func normalizePhone(_ value: String) -> String {
+    nonisolated func normalizePhone(_ value: String) -> String {
         let digits = value.filter(\.isNumber)
         if digits.hasPrefix("1"), digits.count == 11 {
             return String(digits.dropFirst())
@@ -1202,7 +1207,7 @@ final class ContactsManager: ObservableObject {
         return digits
     }
 
-    private func normalizeEmail(_ value: String) -> String {
+    nonisolated func normalizeEmail(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
@@ -1211,7 +1216,7 @@ final class ContactsManager: ObservableObject {
     /// *not* an extra signal for contacts that do have a person name: colleagues
     /// legitimately share an employer, and pairing that with a shared switchboard
     /// number would merge two different people.
-    private func nameSignal(for contact: CNContact) -> (key: String, description: String)? {
+    nonisolated func nameSignal(for contact: CNContact) -> (key: String, description: String)? {
         let personName = [contact.familyName, contact.givenName, contact.middleName]
             .joined()
             .trimmingCharacters(in: .whitespacesAndNewlines)
