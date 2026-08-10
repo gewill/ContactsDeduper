@@ -886,7 +886,7 @@ final class ContactsManager: ObservableObject {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    private func countContactsToAdd(
+    nonisolated func countContactsToAdd(
         _ backupContacts: [BackupContact],
         comparedWith existingContacts: [CNContact]
     ) -> Int {
@@ -1072,7 +1072,9 @@ final class ContactsManager: ObservableObject {
         contactIDs.sorted().joined(separator: "|")
     }
 
-    private func mergeValues(from contact: CNContact, into keeper: CNMutableContact) {
+    /// Internal rather than private so tests can pin down exactly which fields
+    /// survive a merge — this is where a bug silently loses user data.
+    nonisolated func mergeValues(from contact: CNContact, into keeper: CNMutableContact) {
         if keeper.namePrefix.isEmpty { keeper.namePrefix = contact.namePrefix }
         if keeper.givenName.isEmpty { keeper.givenName = contact.givenName }
         if keeper.familyName.isEmpty { keeper.familyName = contact.familyName }
@@ -1139,7 +1141,7 @@ final class ContactsManager: ObservableObject {
         )
     }
 
-    private func preferredKeeper(in group: DuplicateGroup) -> CNContact? {
+    nonisolated func preferredKeeper(in group: DuplicateGroup) -> CNContact? {
         group.contacts.max { first, second in
             let firstScore = contactInformationScore(first)
             let secondScore = contactInformationScore(second)
@@ -1161,7 +1163,7 @@ final class ContactsManager: ObservableObject {
         }
     }
 
-    private func contactInformationScore(_ contact: CNContact) -> Int {
+    private nonisolated func contactInformationScore(_ contact: CNContact) -> Int {
         let textValues = [
             contact.namePrefix, contact.givenName, contact.middleName, contact.familyName,
             contact.previousFamilyName, contact.nameSuffix, contact.nickname,
@@ -1185,13 +1187,13 @@ final class ContactsManager: ObservableObject {
             + (contact.imageDataAvailable ? 3 : 0)
     }
 
-    private func contactSummary(_ contact: CNContact) -> String {
+    private nonisolated func contactSummary(_ contact: CNContact) -> String {
         [contact.phoneSummary, contact.emailSummary, contact.organizationName]
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
     }
 
-    private func additionSummaries(keeper: CNContact, others: [CNContact]) -> [String] {
+    nonisolated func additionSummaries(keeper: CNContact, others: [CNContact]) -> [String] {
         let merged = keeper.mutableCopy() as! CNMutableContact
         for contact in others {
             mergeValues(from: contact, into: merged)
@@ -1237,7 +1239,7 @@ final class ContactsManager: ObservableObject {
         return summaries
     }
 
-    private func textFields(of contact: CNContact) -> [String] {
+    private nonisolated func textFields(of contact: CNContact) -> [String] {
         [
             contact.namePrefix, contact.givenName, contact.middleName, contact.familyName,
             contact.previousFamilyName, contact.nameSuffix, contact.nickname,
@@ -1246,7 +1248,7 @@ final class ContactsManager: ObservableObject {
         ]
     }
 
-    private func uniqueLabeledValues<Value>(
+    private nonisolated func uniqueLabeledValues<Value>(
         existing: [CNLabeledValue<Value>],
         incoming: [CNLabeledValue<Value>],
         normalizer: (CNLabeledValue<Value>) -> String

@@ -101,7 +101,10 @@ xcodebuild test -project ContactsDeduper.xcodeproj \
 - `ContactsDeduper/ContentView.swift`：账户路由、账户内查重、导入导出、批量操作和报告。
 - `ContactsDeduper/ContactsManager.swift`：权限、容器级查询、查重、合并、删除和 Contacts 数据访问。
 - `ContactsDeduper/ContactsBackup.swift`：版本化备份模型、校验、编码与恢复。
-- `ContactsDeduperTests/DuplicateMatchingTests.swift`：判定标准、依据归属、公司名回退与电话规范化的测试。
+- `ContactsDeduperTests/DuplicateMatchingTests.swift`：判定标准、依据归属、公司名回退、多电话多邮箱与电话规范化。
+- `ContactsDeduperTests/ContactMergeTests.swift`：合并字段取舍、保留项选择、预览摘要与导入计数。
+- `ContactsDeduperTests/ContactsBackupTests.swift`：备份编解码往返、格式校验与导入去重签名。
+- `ContactsDeduperTests/DuplicateMatchingPerformanceTests.swift`：查重与排序的基准测试。
 - `ContactsDeduper/Info.plist`：iOS 权限与应用配置。
 - `ContactsDeduper/Info-macOS.plist`：macOS 权限与应用配置。
 
