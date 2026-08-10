@@ -145,6 +145,13 @@ struct ContentView: View {
                 }
             }
         }
+        .disabled(manager.isLoading)
+        .overlay(alignment: .top) {
+            if manager.isLoading {
+                ScanningBanner(title: "正在扫描通讯录")
+            }
+        }
+        .animation(.default, value: manager.isLoading)
     }
 
     private var backupMenu: some View {
@@ -191,12 +198,16 @@ struct ContentView: View {
     }
 
     private func prepareExport() {
-        do {
-            exportDocument = try manager.makeBackupDocument()
-            exportedContactCount = try ContactsBackupArchive.decode(from: exportDocument.data).contacts.count
-            isExporting = true
-        } catch {
-            notice = AppNotice(message: "无法创建备份：\(error.localizedDescription)")
+        Task {
+            do {
+                exportDocument = try await manager.makeBackupDocument()
+                exportedContactCount = try ContactsBackupArchive
+                    .decode(from: exportDocument.data)
+                    .contacts.count
+                isExporting = true
+            } catch {
+                notice = AppNotice(message: "无法创建备份：\(error.localizedDescription)")
+            }
         }
     }
 
@@ -205,24 +216,32 @@ struct ContentView: View {
         return cocoaError.domain == NSCocoaErrorDomain && cocoaError.code == NSUserCancelledError
     }
 
-    private func prepareImport(from result: Result<URL, Error>) {
-        do {
-            let url = try result.get()
-            let didAccess = url.startAccessingSecurityScopedResource()
-            defer {
-                if didAccess { url.stopAccessingSecurityScopedResource() }
-            }
+    /// Reads the picked file while the security-scoped resource is still open, so the
+    /// bytes are in memory before the preview scan suspends.
+    private func readBackup(from result: Result<URL, Error>) throws -> Data {
+        let url = try result.get()
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+        }
 
-            let fileSize = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            guard fileSize <= ContactsBackupArchive.maximumFileSize else {
-                throw ContactsBackupError.fileTooLarge
+        let fileSize = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard fileSize <= ContactsBackupArchive.maximumFileSize else {
+            throw ContactsBackupError.fileTooLarge
+        }
+        return try Data(contentsOf: url, options: .mappedIfSafe)
+    }
+
+    private func prepareImport(from result: Result<URL, Error>) {
+        Task {
+            do {
+                let data = try readBackup(from: result)
+                let preview = try await manager.previewBackup(data: data)
+                pendingImport = PendingContactImport(data: data, preview: preview)
+                showImportConfirmation = true
+            } catch {
+                notice = AppNotice(message: "无法导入备份：\(error.localizedDescription)")
             }
-            let data = try Data(contentsOf: url, options: .mappedIfSafe)
-            let preview = try manager.previewBackup(data: data)
-            pendingImport = PendingContactImport(data: data, preview: preview)
-            showImportConfirmation = true
-        } catch {
-            notice = AppNotice(message: "无法导入备份：\(error.localizedDescription)")
         }
     }
 
@@ -283,7 +302,7 @@ private struct AccountDuplicatesView: View {
 
     var body: some View {
         Group {
-            if manager.isLoading {
+            if manager.isLoading && manager.allContacts.isEmpty {
                 ProgressView("正在扫描“\(account.name)”")
             } else if manager.duplicateGroups.isEmpty && manager.duplicateContactLists.isEmpty {
                 emptyView
@@ -291,6 +310,14 @@ private struct AccountDuplicatesView: View {
                 resultsList
             }
         }
+        // Keep the previous results on screen while a re-scan runs, so a merge does
+        // not blank the list out from under the user.
+        .overlay(alignment: .top) {
+            if manager.isLoading && !manager.allContacts.isEmpty {
+                ScanningBanner(title: "正在重新扫描")
+            }
+        }
+        .animation(.default, value: manager.isLoading)
         .safeAreaInset(edge: .top) {
             matchRuleBar
         }
@@ -534,6 +561,29 @@ private struct DedupSectionHeader: View {
             .disabled(isDisabled)
         }
         .textCase(nil)
+    }
+}
+
+/// Shown while a scan runs. Scans happen off the main actor, so this actually
+/// spins instead of freezing with the rest of the UI.
+private struct ScanningBanner: View {
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().stroke(.separator))
+        .padding(.top, 8)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.updatesFrequently)
     }
 }
 

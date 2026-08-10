@@ -224,7 +224,13 @@ final class ContactsManager: ObservableObject {
 
     private static let matchRuleDefaultsKey = "duplicateMatchRule"
 
-    private let store = CNContactStore()
+    /// Bumped whenever a scan starts. A scan discards its results if another one
+    /// began while it was running, so a slow account cannot overwrite a newer one.
+    private var scanGeneration = 0
+
+    /// `CNContactStore` is thread-safe, and scans must run off the main actor, so
+    /// the nonisolated fetch helpers below share this one instance.
+    private nonisolated(unsafe) let store = CNContactStore()
 
     init() {
         let storedRule = UserDefaults.standard.string(forKey: Self.matchRuleDefaultsKey)
@@ -258,7 +264,7 @@ final class ContactsManager: ObservableObject {
                 return
             }
 
-            contactAccounts = try fetchContactAccounts()
+            contactAccounts = try await loadContactAccounts()
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -283,7 +289,7 @@ final class ContactsManager: ObservableObject {
         defer { isLoading = false }
 
         do {
-            contactAccounts = try fetchContactAccounts()
+            contactAccounts = try await loadContactAccounts()
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -306,7 +312,7 @@ final class ContactsManager: ObservableObject {
         defer { isLoading = false }
 
         do {
-            try reloadActiveAccount()
+            try await reloadActiveAccount()
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -320,22 +326,28 @@ final class ContactsManager: ObservableObject {
         duplicateGroups = findDuplicates(in: allContacts, rule: rule)
     }
 
-    func makeBackupDocument() throws -> ContactsBackupDocument {
+    func makeBackupDocument() async throws -> ContactsBackupDocument {
         guard hasContactsAccess else {
             throw ContactsBackupError.accessDenied
         }
 
-        let archive = ContactsBackupArchive(contacts: try fetchContacts())
+        isLoading = true
+        defer { isLoading = false }
+
+        let archive = ContactsBackupArchive(contacts: try await loadAllContacts())
         return ContactsBackupDocument(data: try archive.encoded())
     }
 
-    func previewBackup(data: Data) throws -> ContactImportPreview {
+    func previewBackup(data: Data) async throws -> ContactImportPreview {
         guard hasContactsAccess else {
             throw ContactsBackupError.accessDenied
         }
 
+        isLoading = true
+        defer { isLoading = false }
+
         let archive = try ContactsBackupArchive.decode(from: data)
-        let existingContacts = try fetchContacts()
+        let existingContacts = try await loadAllContacts()
         return ContactImportPreview(
             exportedAt: archive.exportedAt,
             contactCount: archive.contacts.count,
@@ -352,7 +364,7 @@ final class ContactsManager: ObservableObject {
         defer { isLoading = false }
 
         let archive = try ContactsBackupArchive.decode(from: data)
-        let existingContacts = try fetchContacts()
+        let existingContacts = try await loadAllContacts()
         var existingBySignature = Dictionary(grouping: existingContacts) {
             BackupContact(contact: $0).duplicateSignature
         }
@@ -385,7 +397,7 @@ final class ContactsManager: ObservableObject {
             try store.execute(request)
         }
 
-        try refreshVisibleState()
+        try await refreshVisibleState()
         errorMessage = nil
 
         return ContactImportResult(
@@ -403,7 +415,7 @@ final class ContactsManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        let contacts = try fetchContacts()
+        let contacts = try await loadAllContacts()
         guard !contacts.isEmpty else { return 0 }
 
         let request = CNSaveRequest()
@@ -414,7 +426,7 @@ final class ContactsManager: ObservableObject {
         do {
             try store.execute(request)
         } catch {
-            try? refreshVisibleState()
+            try? await refreshVisibleState()
             throw error
         }
 
@@ -422,7 +434,7 @@ final class ContactsManager: ObservableObject {
         duplicateGroups = []
         duplicateContactLists = []
         activeAccount = nil
-        contactAccounts = try fetchContactAccounts()
+        contactAccounts = try await loadContactAccounts()
         errorMessage = nil
         return contacts.count
     }
@@ -522,7 +534,7 @@ final class ContactsManager: ObservableObject {
         do {
             try store.execute(request)
         } catch {
-            try? refreshVisibleState()
+            try? await refreshVisibleState()
             throw error
         }
 
@@ -530,7 +542,7 @@ final class ContactsManager: ObservableObject {
         bulkMergeProgress = 0.98
         await Task.yield()
 
-        try reloadActiveAccount()
+        try await reloadActiveAccount()
         errorMessage = nil
 
         return BulkMergeResult(
@@ -599,14 +611,14 @@ final class ContactsManager: ObservableObject {
         do {
             try store.execute(request)
         } catch {
-            try? refreshVisibleState()
+            try? await refreshVisibleState()
             throw error
         }
 
         contactListMergeStatus = "正在重新扫描"
         contactListMergeProgress = 0.98
         await Task.yield()
-        try reloadActiveAccount()
+        try await reloadActiveAccount()
         errorMessage = nil
 
         return ContactListBulkMergeResult(
@@ -627,7 +639,7 @@ final class ContactsManager: ObservableObject {
         }
     }
 
-    private func fetchContacts(in containerIdentifier: String? = nil) throws -> [CNContact] {
+    private nonisolated func fetchContacts(in containerIdentifier: String? = nil) throws -> [CNContact] {
         let keys: [CNKeyDescriptor] = [
             CNContact.displayNameDescriptor,
             CNContactIdentifierKey as CNKeyDescriptor,
@@ -684,13 +696,37 @@ final class ContactsManager: ObservableObject {
         return contacts
     }
 
-    private func updateContactState(with contacts: [CNContact], account: ContactAccount) throws {
-        allContacts = contacts
-        duplicateGroups = findDuplicates(in: contacts, rule: matchRule)
-        duplicateContactLists = try fetchDuplicateContactLists(in: account)
+    private struct AccountScan {
+        let contacts: [CNContact]
+        let duplicateGroups: [DuplicateGroup]
+        let duplicateContactLists: [DuplicateContactList]
     }
 
-    private func fetchDuplicateContactLists(in account: ContactAccount) throws -> [DuplicateContactList] {
+    /// Everything an account screen needs, gathered off the main actor: a
+    /// `nonisolated async` function runs on the cooperative pool rather than
+    /// inheriting the caller's actor, so enumerating Contacts — which is
+    /// synchronous and, with image data, slow — no longer freezes the UI.
+    private nonisolated func scanAccount(
+        _ account: ContactAccount,
+        rule: DuplicateMatchRule
+    ) async throws -> AccountScan {
+        let contacts = try fetchContacts(in: account.id)
+        return AccountScan(
+            contacts: contacts,
+            duplicateGroups: findDuplicates(in: contacts, rule: rule),
+            duplicateContactLists: try fetchDuplicateContactLists(in: account)
+        )
+    }
+
+    private nonisolated func loadContactAccounts() async throws -> [ContactAccount] {
+        try fetchContactAccounts()
+    }
+
+    private nonisolated func loadAllContacts() async throws -> [CNContact] {
+        try fetchContacts()
+    }
+
+    private nonisolated func fetchDuplicateContactLists(in account: ContactAccount) throws -> [DuplicateContactList] {
         var duplicates: [DuplicateContactList] = []
         let memberKeys = [CNContactIdentifierKey as CNKeyDescriptor]
 
@@ -739,7 +775,7 @@ final class ContactsManager: ObservableObject {
         }
     }
 
-    private func fetchContactAccounts() throws -> [ContactAccount] {
+    private nonisolated func fetchContactAccounts() throws -> [ContactAccount] {
         let containers = try store.containers(matching: nil)
         let identifierKey = [CNContactIdentifierKey as CNKeyDescriptor]
 
@@ -765,28 +801,36 @@ final class ContactsManager: ObservableObject {
         }
     }
 
-    private func reloadActiveAccount() throws {
+    private func reloadActiveAccount() async throws {
         guard let activeAccount else { return }
-        let contacts = try fetchContacts(in: activeAccount.id)
+
+        scanGeneration += 1
+        let generation = scanGeneration
+        let scan = try await scanAccount(activeAccount, rule: matchRule)
+        // A newer scan started while this one was running; its results win.
+        guard generation == scanGeneration, let currentAccount = self.activeAccount else { return }
+
         let refreshedAccount = ContactAccount(
-            id: activeAccount.id,
-            name: activeAccount.name,
-            typeName: activeAccount.typeName,
-            contactCount: contacts.count
+            id: currentAccount.id,
+            name: currentAccount.name,
+            typeName: currentAccount.typeName,
+            contactCount: scan.contacts.count
         )
         self.activeAccount = refreshedAccount
         if let index = contactAccounts.firstIndex(where: { $0.id == refreshedAccount.id }) {
             contactAccounts[index] = refreshedAccount
         }
-        try updateContactState(with: contacts, account: refreshedAccount)
+        allContacts = scan.contacts
+        duplicateGroups = scan.duplicateGroups
+        duplicateContactLists = scan.duplicateContactLists
     }
 
-    private func refreshVisibleState() throws {
-        contactAccounts = try fetchContactAccounts()
+    private func refreshVisibleState() async throws {
+        contactAccounts = try await loadContactAccounts()
         if let activeAccount,
            let refreshedAccount = contactAccounts.first(where: { $0.id == activeAccount.id }) {
             self.activeAccount = refreshedAccount
-            try reloadActiveAccount()
+            try await reloadActiveAccount()
         } else {
             activeAccount = nil
             allContacts = []
@@ -795,12 +839,12 @@ final class ContactsManager: ObservableObject {
         }
     }
 
-    private func uniqueContacts(_ contacts: [CNContact]) -> [CNContact] {
+    private nonisolated func uniqueContacts(_ contacts: [CNContact]) -> [CNContact] {
         var seenIdentifiers = Set<String>()
         return contacts.filter { seenIdentifiers.insert($0.identifier).inserted }
     }
 
-    private func fetchNonUnifiedContacts(
+    private nonisolated func fetchNonUnifiedContacts(
         matching predicate: NSPredicate,
         keysToFetch: [CNKeyDescriptor]
     ) throws -> [CNContact] {
@@ -815,7 +859,7 @@ final class ContactsManager: ObservableObject {
         return contacts
     }
 
-    private func containerTypeName(_ type: CNContainerType) -> String {
+    private nonisolated func containerTypeName(_ type: CNContainerType) -> String {
         switch type {
         case .local:
             return "本机"
@@ -830,7 +874,7 @@ final class ContactsManager: ObservableObject {
         }
     }
 
-    private func normalizeListName(_ value: String) -> String {
+    private nonisolated func normalizeListName(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
