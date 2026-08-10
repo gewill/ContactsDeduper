@@ -23,6 +23,24 @@ func openContactsPrivacySettings() {
 #endif
 }
 
+#if os(macOS)
+/// macOS caches the TCC decision for the life of the process: flipping the switch in
+/// System Settings never reaches a running app, which is why the system itself offers
+/// "Quit & Reopen" rather than applying it live. Do the same. If launching the new
+/// instance is refused, the app still quits, leaving the user to reopen it by hand.
+@MainActor
+func relaunchApp() {
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.createsNewApplicationInstance = true
+    NSWorkspace.shared.openApplication(
+        at: Bundle.main.bundleURL,
+        configuration: configuration
+    ) { _, _ in
+        Task { @MainActor in NSApp.terminate(nil) }
+    }
+}
+#endif
+
 struct ContentView: View {
     @StateObject private var manager = ContactsManager()
     @Environment(\.scenePhase) private var scenePhase
@@ -335,9 +353,15 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
 
+#if os(macOS)
+                Button("我已开启，重新打开应用") {
+                    relaunchApp()
+                }
+#else
                 Button("我已开启，重新检查") {
                     Task { await manager.refreshAuthorizationStatus() }
                 }
+#endif
 
             case .restricted, .granted, .limited:
                 EmptyView()
@@ -369,7 +393,9 @@ struct ContentView: View {
 #if os(iOS)
         return "通讯录访问已被拒绝。前往「设置 › ContactsDeduper › 通讯录」打开开关，回到应用后会自动重新扫描。"
 #else
-        return "通讯录访问已被拒绝。前往「系统设置 › 隐私与安全性 › 通讯录」勾选 ContactsDeduper，回到应用后会自动重新扫描。"
+        // macOS caches the decision for the life of the process, so no amount of
+        // re-checking helps — the app has to start again.
+        return "通讯录访问已被拒绝。前往「系统设置 › 隐私与安全性 › 通讯录」勾选 ContactsDeduper，然后重新打开应用，权限才会生效。"
 #endif
     }
 }
