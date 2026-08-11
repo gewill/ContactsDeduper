@@ -18,6 +18,8 @@
 | iOS 次分类 | Productivity（效率） |
 | macOS 分类 | Utilities（需与工程中的 `LSApplicationCategoryType` 保持一致） |
 | 隐私政策 URL | `https://github.com/gewill/ContactsDeduper/blob/main/PRIVACY.md`，或部署后的稳定 HTTPS 页面 |
+| 支持网址 | `https://github.com/gewill/ContactsDeduper/issues` |
+| 应用名称 / 副标题 | `ContactsDeduper` / 按目标商店语言填写不超过 30 字符的副标题 |
 | 数据收集 | 不收集；联系人数据只在设备本地处理，不上传服务器 |
 | 跟踪 | 不跟踪；无广告、分析、遥测或第三方追踪 SDK |
 | 出口合规 | 本工程已声明 `ITSAppUsesNonExemptEncryption = NO`；首次上传仍按 App Store Connect 问卷确认 |
@@ -32,6 +34,20 @@
 4. 在 App Privacy 中确认联系人信息不会被收集或与身份关联，并逐项核对 Apple 问卷。
 5. 配置有效的 Distribution Certificate、Provisioning Profile、Team 和签名能力后再 Archive/上传。
 6. 首次上传后检查 TestFlight 的 Export Compliance 状态；若出现 Missing Compliance，按 App Store Connect 提示完成问卷。
+
+## App Review 备注建议
+
+- 无需登录、账号或测试凭据。
+- 首次启动后允许 Contacts 权限；选择账户即可开始扫描。
+- 所有联系人处理均在本机完成，不需要网络连接。
+- 合并和删除操作均会先展示预览并要求明确确认。
+- 审核截图和备注不得包含真实联系人姓名、电话、邮箱或备份文件。
+
+## 本地验证
+
+- Xcode 26.6：iOS Release Simulator build ✅
+- Xcode 26.6：macOS Release build ✅
+- 归档上传前仍需使用有效 Team、Distribution 证书和正式 provisioning profile。
 
 ## English checklist
 
