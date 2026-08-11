@@ -49,7 +49,7 @@
 
 ## 快速开始
 
-要求：Xcode 16 或更高版本、iOS 17 或更高版本、macOS 14 或更高版本。
+要求：iOS 17 或更高版本、macOS 14 或更高版本。目前仅在 Xcode 26（本地验证版本为 Xcode 26.6）上验证；其他 Xcode 版本尚未验证，不保证兼容。
 
 打开 `ContactsDeduper.xcodeproj`，选择 iPhone 模拟器、iOS 真机或 `My Mac` 后运行。首次启动需要允许通讯录访问。
 

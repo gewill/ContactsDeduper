@@ -49,7 +49,7 @@ System contact groups such as “Family” and “Work” are not part of contac
 
 ## Quick start
 
-Requirements: Xcode 16 or later, iOS 17 or later, and macOS 14 or later.
+Requirements: iOS 17 or later and macOS 14 or later. The project is currently verified only with Xcode 26 (locally tested with Xcode 26.6); other Xcode versions are unverified and compatibility is not guaranteed.
 
 Open `ContactsDeduper.xcodeproj`, choose an iPhone Simulator, an iOS device, or `My Mac`, and run. The first launch requests Contacts access.
 
