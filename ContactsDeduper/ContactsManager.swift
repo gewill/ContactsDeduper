@@ -260,9 +260,20 @@ final class ContactsManager: ObservableObject {
     /// Bumped whenever a scan starts. A scan discards its results if another one
     /// began while it was running, so a slow account cannot overwrite a newer one.
     private var scanGeneration = 0
+    private var loadingOperationCount = 0
 
     var currentScanGeneration: Int {
         scanGeneration
+    }
+
+    private func beginLoading() {
+        loadingOperationCount += 1
+        isLoading = true
+    }
+
+    private func endLoading() {
+        loadingOperationCount = max(0, loadingOperationCount - 1)
+        isLoading = loadingOperationCount > 0
     }
 
     /// `CNContactStore` is thread-safe, and scans must run off the main actor, so
@@ -287,8 +298,8 @@ final class ContactsManager: ObservableObject {
     }
 
     func requestAccessAndLoad() async {
-        isLoading = true
-        defer { isLoading = false }
+        beginLoading()
+        defer { endLoading() }
 
         do {
             if authorizationStatus == .notDetermined {
@@ -344,8 +355,8 @@ final class ContactsManager: ObservableObject {
             return
         }
 
-        isLoading = true
-        defer { isLoading = false }
+        beginLoading()
+        defer { endLoading() }
 
         do {
             contactAccounts = try await loadContactAccounts()
@@ -367,8 +378,8 @@ final class ContactsManager: ObservableObject {
             duplicateContactLists = []
         }
         activeAccount = account
-        isLoading = true
-        defer { isLoading = false }
+        beginLoading()
+        defer { endLoading() }
 
         do {
             try await reloadActiveAccount()
@@ -390,8 +401,8 @@ final class ContactsManager: ObservableObject {
             throw ContactsBackupError.accessDenied
         }
 
-        isLoading = true
-        defer { isLoading = false }
+        beginLoading()
+        defer { endLoading() }
 
         let archive = ContactsBackupArchive(contacts: try await loadAllContacts())
         return ContactsBackupDocument(data: try archive.encoded())
@@ -402,8 +413,8 @@ final class ContactsManager: ObservableObject {
             throw ContactsBackupError.accessDenied
         }
 
-        isLoading = true
-        defer { isLoading = false }
+        beginLoading()
+        defer { endLoading() }
 
         let archive = try ContactsBackupArchive.decode(from: data)
         let existingContacts = try await loadAllContacts()
@@ -419,8 +430,8 @@ final class ContactsManager: ObservableObject {
             throw ContactsBackupError.accessDenied
         }
 
-        isLoading = true
-        defer { isLoading = false }
+        beginLoading()
+        defer { endLoading() }
 
         let archive = try ContactsBackupArchive.decode(from: data)
         let existingContacts = try await loadAllContacts()
@@ -471,8 +482,8 @@ final class ContactsManager: ObservableObject {
             throw ContactsBackupError.accessDenied
         }
 
-        isLoading = true
-        defer { isLoading = false }
+        beginLoading()
+        defer { endLoading() }
 
         let contacts = try await loadAllContacts()
         guard !contacts.isEmpty else { return 0 }
