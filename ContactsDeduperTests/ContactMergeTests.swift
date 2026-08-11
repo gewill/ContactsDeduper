@@ -212,7 +212,7 @@ final class ContactMergeTests: XCTestCase {
         XCTAssertTrue(summaries.contains("邮箱 +1"), "\(summaries)")
         XCTAssertTrue(summaries.contains("生日"), "\(summaries)")
         XCTAssertTrue(summaries.contains("头像"), "\(summaries)")
-        XCTAssertTrue(summaries.contains("文字资料 +1"), "\(summaries)")
+        XCTAssertTrue(summaries.contains("公司"), "\(summaries)")
     }
 
     func testPreviewPromisesNothingWhenTheKeeperAlreadyHasEverything() {
@@ -242,6 +242,7 @@ final class ContactMergeTests: XCTestCase {
             keeperName: "张三",
             keeperSummary: "",
             removedNames: ["张三"],
+            removedSummaries: [],
             additions: []
         )
         XCTAssertEqual(nothingNew.additionSummary, "无新增资料")
@@ -254,6 +255,7 @@ final class ContactMergeTests: XCTestCase {
             keeperName: "张三",
             keeperSummary: "",
             removedNames: ["张三", "张小三"],
+            removedSummaries: [],
             additions: ["电话 +1", "头像"]
         )
         XCTAssertEqual(withAdditions.additionSummary, "补齐 电话 +1 · 头像")

@@ -439,7 +439,7 @@ private struct AccountDuplicatesView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .accessibilityLabel("重新扫描账户")
-                .disabled(isMerging)
+                .disabled(isMerging || manager.isLoading)
             }
         }
         .task(id: account.id) {
@@ -447,7 +447,12 @@ private struct AccountDuplicatesView: View {
         }
         .sheet(item: $mergePlan) { plan in
             BulkMergePreviewView(accountName: account.name, items: plan.items) { selectedIDs in
-                Task { await mergeContacts(groupIDs: selectedIDs) }
+                Task {
+                    await mergeContacts(
+                        groupIDs: selectedIDs,
+                        expectedScanGeneration: plan.scanGeneration
+                    )
+                }
             }
             .presentationDetentsOnIOS()
         }
@@ -595,14 +600,14 @@ private struct AccountDuplicatesView: View {
                         count: manager.duplicateGroups.count,
                         buttonTitle: "一键合并",
                         systemImage: "person.2.badge.gearshape",
-                        isDisabled: isMerging || manager.duplicateGroups.isEmpty
+                        isDisabled: isMerging || manager.isLoading || manager.duplicateGroups.isEmpty
                     ) {
                         showMergePreview()
                     }
                 }
             }
         }
-        .disabled(isMerging)
+        .disabled(isMerging || manager.isLoading)
     }
 
     private var emptyView: some View {
@@ -624,13 +629,19 @@ private struct AccountDuplicatesView: View {
             notice = AppNotice(message: "没有可合并的重复联系人。")
             return
         }
-        mergePlan = BulkMergePlan(items: items)
+        mergePlan = BulkMergePlan(
+            items: items,
+            scanGeneration: manager.currentScanGeneration
+        )
     }
 
     @MainActor
-    private func mergeContacts(groupIDs: Set<String>) async {
+    private func mergeContacts(groupIDs: Set<String>, expectedScanGeneration: Int) async {
         do {
-            mergeReport = try await manager.mergeAllDuplicates(groupIDs: groupIDs)
+            mergeReport = try await manager.mergeAllDuplicates(
+                groupIDs: groupIDs,
+                expectedScanGeneration: expectedScanGeneration
+            )
         } catch {
             notice = AppNotice(message: "联系人合并失败：\(error.localizedDescription)")
         }
@@ -749,6 +760,7 @@ private struct PendingContactImport {
 private struct BulkMergePlan: Identifiable {
     let id = UUID()
     let items: [BulkMergePlanItem]
+    let scanGeneration: Int
 }
 
 private struct BulkMergePreviewView: View {

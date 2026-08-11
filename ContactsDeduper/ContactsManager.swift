@@ -181,14 +181,27 @@ struct BulkMergePlanItem: Identifiable {
     let keeperName: String
     let keeperSummary: String
     let removedNames: [String]
+    let removedSummaries: [String]
     let additions: [String]
 
     var removedSummary: String {
-        removedNames.joined(separator: "、")
+        let values = removedSummaries.isEmpty ? removedNames : removedSummaries
+        return values.joined(separator: "、")
     }
 
     var additionSummary: String {
         additions.isEmpty ? "无新增资料" : "补齐 \(additions.joined(separator: " · "))"
+    }
+}
+
+enum ContactsManagerError: LocalizedError {
+    case staleBulkMergePreview
+
+    var errorDescription: String? {
+        switch self {
+        case .staleBulkMergePreview:
+            return "通讯录在预览后发生变化，请重新打开合并预览。"
+        }
     }
 }
 
@@ -247,6 +260,10 @@ final class ContactsManager: ObservableObject {
     /// Bumped whenever a scan starts. A scan discards its results if another one
     /// began while it was running, so a slow account cannot overwrite a newer one.
     private var scanGeneration = 0
+
+    var currentScanGeneration: Int {
+        scanGeneration
+    }
 
     /// `CNContactStore` is thread-safe, and scans must run off the main actor, so
     /// the nonisolated fetch helpers below share this one instance.
@@ -505,7 +522,7 @@ final class ContactsManager: ObservableObject {
 
     /// Dry run of `mergeAllDuplicates`: what each group would keep, delete, and gain.
     func makeBulkMergePlan() -> [BulkMergePlanItem] {
-        duplicateGroups.compactMap { group in
+        duplicateGroups.compactMap { group -> BulkMergePlanItem? in
             guard let keeper = preferredKeeper(in: group) else { return nil }
             let removed = group.contacts.filter { $0.identifier != keeper.identifier }
             guard !removed.isEmpty else { return nil }
@@ -517,14 +534,22 @@ final class ContactsManager: ObservableObject {
                 keeperName: keeper.displayName,
                 keeperSummary: contactSummary(keeper),
                 removedNames: removed.map(\.displayName),
+                removedSummaries: removed.map(contactReviewSummary),
                 additions: additionSummaries(keeper: keeper, others: removed)
             )
         }
     }
 
-    func mergeAllDuplicates(groupIDs: Set<String>) async throws -> BulkMergeResult {
+    func mergeAllDuplicates(
+        groupIDs: Set<String>,
+        expectedScanGeneration: Int? = nil
+    ) async throws -> BulkMergeResult {
         guard hasContactsAccess else {
             throw ContactsBackupError.accessDenied
+        }
+
+        if let expectedScanGeneration, expectedScanGeneration != scanGeneration {
+            throw ContactsManagerError.staleBulkMergePreview
         }
 
         let groups = duplicateGroups.filter { groupIDs.contains($0.id) }
@@ -1223,13 +1248,7 @@ final class ContactsManager: ObservableObject {
     }
 
     private nonisolated func contactInformationScore(_ contact: CNContact) -> Int {
-        let textValues = [
-            contact.namePrefix, contact.givenName, contact.middleName, contact.familyName,
-            contact.previousFamilyName, contact.nameSuffix, contact.nickname,
-            contact.phoneticGivenName, contact.phoneticMiddleName, contact.phoneticFamilyName,
-            contact.organizationName, contact.departmentName, contact.jobTitle
-        ]
-        let populatedTextCount = textValues.filter { !$0.isEmpty }.count
+        let populatedTextCount = textFields(of: contact).filter { !$0.value.isEmpty }.count
         let collectionValueCount = contact.phoneNumbers.count
             + contact.emailAddresses.count
             + contact.postalAddresses.count
@@ -1247,9 +1266,21 @@ final class ContactsManager: ObservableObject {
     }
 
     private nonisolated func contactSummary(_ contact: CNContact) -> String {
-        [contact.phoneSummary, contact.emailSummary, contact.organizationName]
+        [
+            contact.phoneSummary,
+            contact.emailSummary,
+            contact.organizationName,
+            contact.departmentName,
+            contact.jobTitle
+        ]
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
+    }
+
+    private nonisolated func contactReviewSummary(_ contact: CNContact) -> String {
+        let name = contact.displayName
+        let details = contactSummary(contact)
+        return details.isEmpty ? name : "\(name)（\(details)）"
     }
 
     nonisolated func additionSummaries(keeper: CNContact, others: [CNContact]) -> [String] {
@@ -1288,22 +1319,30 @@ final class ContactsManager: ObservableObject {
             summaries.append("头像")
         }
 
-        let filledTextCount = zip(textFields(of: keeper), textFields(of: merged))
-            .filter { $0.isEmpty && !$1.isEmpty }
-            .count
-        if filledTextCount > 0 {
-            summaries.append("文字资料 +\(filledTextCount)")
-        }
+        let textAdditions = zip(textFields(of: keeper), textFields(of: merged))
+            .compactMap { before, after in
+                before.value.isEmpty && !after.value.isEmpty ? before.label : nil
+            }
+        summaries.append(contentsOf: textAdditions)
 
         return summaries
     }
 
-    private nonisolated func textFields(of contact: CNContact) -> [String] {
+    private nonisolated func textFields(of contact: CNContact) -> [(label: String, value: String)] {
         [
-            contact.namePrefix, contact.givenName, contact.middleName, contact.familyName,
-            contact.previousFamilyName, contact.nameSuffix, contact.nickname,
-            contact.phoneticGivenName, contact.phoneticMiddleName, contact.phoneticFamilyName,
-            contact.organizationName, contact.departmentName, contact.jobTitle
+            ("姓名前缀", contact.namePrefix),
+            ("名", contact.givenName),
+            ("姓", contact.familyName),
+            ("中间名", contact.middleName),
+            ("曾用姓", contact.previousFamilyName),
+            ("姓名后缀", contact.nameSuffix),
+            ("昵称", contact.nickname),
+            ("拼音名", contact.phoneticGivenName),
+            ("拼音中间名", contact.phoneticMiddleName),
+            ("拼音姓", contact.phoneticFamilyName),
+            ("公司", contact.organizationName),
+            ("部门", contact.departmentName),
+            ("职务", contact.jobTitle)
         ]
     }
 
