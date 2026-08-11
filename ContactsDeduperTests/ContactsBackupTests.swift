@@ -297,7 +297,7 @@ final class ContactsBackupTests: XCTestCase {
     }
 }
 
-extension ContactsBackupError: @retroactive Equatable {
+extension ContactsBackupError: Equatable {
     public static func == (lhs: ContactsBackupError, rhs: ContactsBackupError) -> Bool {
         switch (lhs, rhs) {
         case (.accessDenied, .accessDenied),
