@@ -7,11 +7,12 @@ ContactsDeduper 是一个使用 SwiftUI 和 Contacts 框架构建的本地通讯
 ## 功能
 
 - 首屏按本机、iCloud、Google 等通讯录账户列出容器，进入账户后再独立查重。
-- 扫描姓名、电话号码或邮箱相同的联系人。
+- 扫描名称、电话号码或邮箱相同的联系人，公司类联系人按公司名比对。
+- 提供四档判定标准（两项相同 / 任一项 / 仅名称 / 仅电话），可随时切换。
 - 展示每组重复联系人的全部判定依据及命中对象。
 - 扫描并合并同一通讯录账户内的同名 List，同时保留全部成员。
 - 手动选择保留项并合并单组联系人。
-- 一键同步合并全部重复项，并显示实时进度。
+- 一键合并前先预览每组的保留项、删除项和补齐字段，可逐组取消后再执行。
 - 合并完成后展示统计报告和撒花效果。
 - 将通讯录导出为版本化 JSON 备份。
 - 从备份中安全恢复缺失联系人，不删除或覆盖现有联系人。
@@ -19,13 +20,24 @@ ContactsDeduper 是一个使用 SwiftUI 和 Contacts 框架构建的本地通讯
 
 ## 查重规则
 
-应用使用以下信息建立重复关系：
+应用比对以下三类信息：
 
-1. 规范化后的电话号码相同。
-2. 忽略大小写和首尾空格后的邮箱相同。
-3. 姓、名和中间名组合后相同。
+1. **名称**：姓、名和中间名组合后相同。公司类联系人（没有填写姓名，只有公司）改用公司名比对。公司名只在没有姓名时作为回退，不会附加到已有姓名上——否则同一家公司的不同同事会被误判为同一个人。
+2. **电话**：规范化后的号码相同。
+3. **邮箱**：忽略大小写和首尾空格后相同。
 
-匹配关系会进行链式合并。例如 A 与 B 电话相同、B 与 C 姓名相同，三者会进入同一个重复组。系统通讯录中的“家人”“工作”等分组不参与查重。
+判定标准可在账户页顶部随时切换，切换后立即重算，无需重新读取通讯录：
+
+| 标准 | 含义 |
+| --- | --- |
+| 两项（默认） | 名称、电话、邮箱中至少两项同时相同才算重复 |
+| 任一项 | 三项中任意一项相同就算重复 |
+| 仅名称 | 只看名称，忽略电话与邮箱 |
+| 仅电话 | 只看电话，忽略名称与邮箱 |
+
+达到标准的两个联系人会建立关联，关联关系再进行链式合并。例如在「任一项」下，A 与 B 电话相同、B 与 C 名称相同，三者会进入同一个重复组。注意「两项」判定的是**联系人两两之间**的证据数量：共处同一个电话分桶只算一项证据，不足两项不会建立关联。
+
+系统通讯录中的“家人”“工作”等分组不参与查重。
 
 联系人 List 使用独立规则处理：名称忽略大小写和首尾空格后相同，并且属于同一个 Contacts 容器时，才会显示为可合并。跨 iCloud、Google 或其他账户的同名 List 不会自动合并。
 
@@ -66,11 +78,33 @@ xcodebuild -project ContactsDeduper.xcodeproj \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
+## 单元测试
+
+查重规则由 `ContactsDeduperTests` 覆盖。测试直接调用 `findDuplicates(in:rule:)`，只读传入的联系人对象，不访问 `CNContactStore`，因此不需要通讯录权限，也不会启动 App（测试包刻意不设 `TEST_HOST`）。
+
+```bash
+xcodebuild test -project ContactsDeduper.xcodeproj \
+  -scheme ContactsDeduper \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+```bash
+xcodebuild test -project ContactsDeduper.xcodeproj \
+  -scheme ContactsDeduper \
+  -destination 'platform=macOS,arch=arm64' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
 ## 项目结构
 
 - `ContactsDeduper/ContentView.swift`：账户路由、账户内查重、导入导出、批量操作和报告。
 - `ContactsDeduper/ContactsManager.swift`：权限、容器级查询、查重、合并、删除和 Contacts 数据访问。
 - `ContactsDeduper/ContactsBackup.swift`：版本化备份模型、校验、编码与恢复。
+- `ContactsDeduperTests/DuplicateMatchingTests.swift`：判定标准、依据归属、公司名回退、多电话多邮箱与电话规范化。
+- `ContactsDeduperTests/ContactMergeTests.swift`：合并字段取舍、保留项选择、预览摘要与导入计数。
+- `ContactsDeduperTests/ContactsBackupTests.swift`：备份编解码往返、格式校验与导入去重签名。
+- `ContactsDeduperTests/DuplicateMatchingPerformanceTests.swift`：查重与排序的基准测试。
 - `ContactsDeduper/Info.plist`：iOS 权限与应用配置。
 - `ContactsDeduper/Info-macOS.plist`：macOS 权限与应用配置。
 

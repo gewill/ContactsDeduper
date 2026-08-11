@@ -50,6 +50,21 @@ xcodebuild -quiet -project ContactsDeduper.xcodeproj \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
+Run the unit tests after changing duplicate matching, on either platform:
+
+```bash
+xcodebuild test -project ContactsDeduper.xcodeproj \
+  -scheme ContactsDeduper \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+`ContactsDeduperTests` is a logic-only bundle with no `TEST_HOST`: it compiles the
+sources under test directly, so it never launches the app and never triggers a
+Contacts permission prompt. Keep it that way — a hosted bundle would block
+`xcodebuild test` on a permission dialog. Cover new matching behaviour there,
+including the false-merge cases a change must *not* introduce.
+
 When changing backup models, also verify an encode/decode/contact-reconstruction round trip and rejection of malformed JSON.
 
 ## Repository Hygiene

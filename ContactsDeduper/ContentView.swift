@@ -2,9 +2,48 @@ import Contacts
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
+
+/// Opens the place where Contacts access can be granted: the app's own settings page
+/// on iOS, the Privacy & Security pane on macOS, which has no per-app page.
+@MainActor
+func openContactsPrivacySettings() {
+#if os(iOS)
+    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+    UIApplication.shared.open(url)
+#elseif os(macOS)
+    guard let url = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts"
+    ) else { return }
+    NSWorkspace.shared.open(url)
+#endif
+}
+
+#if os(macOS)
+/// macOS caches the TCC decision for the life of the process: flipping the switch in
+/// System Settings never reaches a running app, which is why the system itself offers
+/// "Quit & Reopen" rather than applying it live. Do the same. If launching the new
+/// instance is refused, the app still quits, leaving the user to reopen it by hand.
+@MainActor
+func relaunchApp() {
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.createsNewApplicationInstance = true
+    NSWorkspace.shared.openApplication(
+        at: Bundle.main.bundleURL,
+        configuration: configuration
+    ) { _, _ in
+        Task { @MainActor in NSApp.terminate(nil) }
+    }
+}
+#endif
 
 struct ContentView: View {
     @StateObject private var manager = ContactsManager()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var exportDocument = ContactsBackupDocument()
     @State private var exportedContactCount = 0
     @State private var isExporting = false
@@ -19,7 +58,7 @@ struct ContentView: View {
             Group {
                 if manager.isLoading && manager.contactAccounts.isEmpty {
                     ProgressView("正在加载通讯录账户")
-                } else if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted {
+                } else if !manager.permissionState.allowsAccess {
                     permissionView
                 } else if manager.contactAccounts.isEmpty {
                     emptyView
@@ -43,6 +82,12 @@ struct ContentView: View {
             }
             .task {
                 await manager.requestAccessAndLoad()
+            }
+            // The setting can be flipped while the app is in the background, so pick
+            // the change up on return instead of making the user relaunch.
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await manager.refreshAuthorizationStatus() }
             }
             .alert("提示", isPresented: Binding(
                 get: { manager.errorMessage != nil },
@@ -117,6 +162,12 @@ struct ContentView: View {
 
     private var accountList: some View {
         List {
+            if manager.permissionState == .limited {
+                Section {
+                    LimitedAccessNotice()
+                }
+            }
+
             Section("账户") {
                 ForEach(manager.contactAccounts) { account in
                     NavigationLink {
@@ -145,6 +196,13 @@ struct ContentView: View {
                 }
             }
         }
+        .disabled(manager.isLoading)
+        .overlay(alignment: .top) {
+            if manager.isLoading {
+                ScanningBanner(title: "正在扫描通讯录")
+            }
+        }
+        .animation(.default, value: manager.isLoading)
     }
 
     private var backupMenu: some View {
@@ -191,12 +249,16 @@ struct ContentView: View {
     }
 
     private func prepareExport() {
-        do {
-            exportDocument = try manager.makeBackupDocument()
-            exportedContactCount = try ContactsBackupArchive.decode(from: exportDocument.data).contacts.count
-            isExporting = true
-        } catch {
-            notice = AppNotice(message: "无法创建备份：\(error.localizedDescription)")
+        Task {
+            do {
+                exportDocument = try await manager.makeBackupDocument()
+                exportedContactCount = try ContactsBackupArchive
+                    .decode(from: exportDocument.data)
+                    .contacts.count
+                isExporting = true
+            } catch {
+                notice = AppNotice(message: "无法创建备份：\(error.localizedDescription)")
+            }
         }
     }
 
@@ -205,24 +267,32 @@ struct ContentView: View {
         return cocoaError.domain == NSCocoaErrorDomain && cocoaError.code == NSUserCancelledError
     }
 
-    private func prepareImport(from result: Result<URL, Error>) {
-        do {
-            let url = try result.get()
-            let didAccess = url.startAccessingSecurityScopedResource()
-            defer {
-                if didAccess { url.stopAccessingSecurityScopedResource() }
-            }
+    /// Reads the picked file while the security-scoped resource is still open, so the
+    /// bytes are in memory before the preview scan suspends.
+    private func readBackup(from result: Result<URL, Error>) throws -> Data {
+        let url = try result.get()
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+        }
 
-            let fileSize = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            guard fileSize <= ContactsBackupArchive.maximumFileSize else {
-                throw ContactsBackupError.fileTooLarge
+        let fileSize = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard fileSize <= ContactsBackupArchive.maximumFileSize else {
+            throw ContactsBackupError.fileTooLarge
+        }
+        return try Data(contentsOf: url, options: .mappedIfSafe)
+    }
+
+    private func prepareImport(from result: Result<URL, Error>) {
+        Task {
+            do {
+                let data = try readBackup(from: result)
+                let preview = try await manager.previewBackup(data: data)
+                pendingImport = PendingContactImport(data: data, preview: preview)
+                showImportConfirmation = true
+            } catch {
+                notice = AppNotice(message: "无法导入备份：\(error.localizedDescription)")
             }
-            let data = try Data(contentsOf: url, options: .mappedIfSafe)
-            let preview = try manager.previewBackup(data: data)
-            pendingImport = PendingContactImport(data: data, preview: preview)
-            showImportConfirmation = true
-        } catch {
-            notice = AppNotice(message: "无法导入备份：\(error.localizedDescription)")
         }
     }
 
@@ -266,30 +336,98 @@ struct ContentView: View {
 
     private var permissionView: some View {
         ContentUnavailableView {
-            Label("需要通讯录权限", systemImage: "person.crop.circle.badge.exclamationmark")
+            Label(permissionTitle, systemImage: "person.crop.circle.badge.exclamationmark")
         } description: {
-            Text("打开系统设置，为 ContactsDeduper 启用通讯录访问权限。")
+            Text(permissionDescription)
+        } actions: {
+            switch manager.permissionState {
+            case .notDetermined:
+                Button("允许访问通讯录") {
+                    Task { await manager.requestAccessAndLoad() }
+                }
+                .buttonStyle(.borderedProminent)
+
+            case .denied:
+                Button("打开系统设置") {
+                    openContactsPrivacySettings()
+                }
+                .buttonStyle(.borderedProminent)
+
+#if os(macOS)
+                Button("我已开启，重新打开应用") {
+                    relaunchApp()
+                }
+#else
+                Button("我已开启，重新检查") {
+                    Task { await manager.refreshAuthorizationStatus() }
+                }
+#endif
+
+            case .restricted, .granted, .limited:
+                EmptyView()
+            }
         }
+    }
+
+    private var permissionTitle: String {
+        switch manager.permissionState {
+        case .restricted:
+            return "通讯录访问被限制"
+        default:
+            return "需要通讯录权限"
+        }
+    }
+
+    private var permissionDescription: String {
+        switch manager.permissionState {
+        case .notDetermined:
+            return "ContactsDeduper 需要读取通讯录才能查找重复联系人。全部处理都在本机完成，不会上传。"
+        case .restricted:
+            return "屏幕使用时间或设备管理配置禁止访问通讯录，需要由管理者解除限制，在设置中打开开关无效。"
+        default:
+            return settingsPathHint
+        }
+    }
+
+    private var settingsPathHint: String {
+#if os(iOS)
+        return "通讯录访问已被拒绝。前往「设置 › ContactsDeduper › 通讯录」打开开关，回到应用后会自动重新扫描。"
+#else
+        // macOS caches the decision for the life of the process, so no amount of
+        // re-checking helps — the app has to start again.
+        return "通讯录访问已被拒绝。前往「系统设置 › 隐私与安全性 › 通讯录」勾选 ContactsDeduper，然后重新打开应用，权限才会生效。"
+#endif
     }
 }
 
 private struct AccountDuplicatesView: View {
     let account: ContactAccount
     @ObservedObject var manager: ContactsManager
-    @State private var showContactMergeConfirmation = false
+    @State private var mergePlan: BulkMergePlan?
     @State private var showListMergeConfirmation = false
     @State private var mergeReport: BulkMergeResult?
     @State private var notice: AppNotice?
 
     var body: some View {
         Group {
-            if manager.isLoading {
+            if manager.isLoading && manager.allContacts.isEmpty {
                 ProgressView("正在扫描“\(account.name)”")
             } else if manager.duplicateGroups.isEmpty && manager.duplicateContactLists.isEmpty {
                 emptyView
             } else {
                 resultsList
             }
+        }
+        // Keep the previous results on screen while a re-scan runs, so a merge does
+        // not blank the list out from under the user.
+        .overlay(alignment: .top) {
+            if manager.isLoading && !manager.allContacts.isEmpty {
+                ScanningBanner(title: "正在重新扫描")
+            }
+        }
+        .animation(.default, value: manager.isLoading)
+        .safeAreaInset(edge: .top) {
+            matchRuleBar
         }
         .navigationTitle(account.name)
         .inlineNavigationTitleOnIOS()
@@ -301,23 +439,22 @@ private struct AccountDuplicatesView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .accessibilityLabel("重新扫描账户")
-                .disabled(isMerging)
+                .disabled(isMerging || manager.isLoading)
             }
         }
         .task(id: account.id) {
             await manager.loadAccount(account)
         }
-        .confirmationDialog(
-            "合并 \(manager.duplicateGroups.count) 组重复联系人？",
-            isPresented: $showContactMergeConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("合并并删除重复项", role: .destructive) {
-                Task { await mergeContacts() }
+        .sheet(item: $mergePlan) { plan in
+            BulkMergePreviewView(accountName: account.name, items: plan.items) { selectedIDs in
+                Task {
+                    await mergeContacts(
+                        groupIDs: selectedIDs,
+                        expectedScanGeneration: plan.scanGeneration
+                    )
+                }
             }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("只处理“\(account.name)”账户。每组保留资料最完整的一项，并补齐其他资料。建议先导出备份。")
+            .presentationDetentsOnIOS()
         }
         .confirmationDialog(
             "合并 \(manager.duplicateContactLists.count) 组同名 List？",
@@ -346,6 +483,40 @@ private struct AccountDuplicatesView: View {
 
     private var isMerging: Bool {
         manager.isBulkMerging || manager.isBulkMergingContactLists
+    }
+
+    private var matchRuleBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("账户内查重", systemImage: "sparkle.magnifyingglass")
+                Spacer()
+                Text("共 \(manager.allContacts.count) 人")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.subheadline.weight(.medium))
+
+            Picker("判定标准", selection: matchRuleBinding) {
+                ForEach(DuplicateMatchRule.allCases) { rule in
+                    Text(rule.shortTitle).tag(rule)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(isMerging || manager.isLoading)
+
+            Text(manager.matchRule.detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.bar)
+    }
+
+    private var matchRuleBinding: Binding<DuplicateMatchRule> {
+        Binding(
+            get: { manager.matchRule },
+            set: { manager.setMatchRule($0) }
+        )
     }
 
     private var resultsList: some View {
@@ -429,32 +600,21 @@ private struct AccountDuplicatesView: View {
                         count: manager.duplicateGroups.count,
                         buttonTitle: "一键合并",
                         systemImage: "person.2.badge.gearshape",
-                        isDisabled: isMerging || manager.duplicateGroups.isEmpty
+                        isDisabled: isMerging || manager.isLoading || manager.duplicateGroups.isEmpty
                     ) {
-                        showContactMergeConfirmation = true
+                        showMergePreview()
                     }
                 }
             }
         }
-        .safeAreaInset(edge: .top) {
-            HStack {
-                Label("账户内查重", systemImage: "sparkle.magnifyingglass")
-                Spacer()
-                Text("共 \(manager.allContacts.count) 人")
-                    .foregroundStyle(.secondary)
-            }
-            .font(.subheadline.weight(.medium))
-            .padding()
-            .background(.bar)
-        }
-        .disabled(isMerging)
+        .disabled(isMerging || manager.isLoading)
     }
 
     private var emptyView: some View {
         ContentUnavailableView {
             Label("这个账户没有重复项", systemImage: "checkmark.seal")
         } description: {
-            Text("已扫描“\(account.name)”中的 \(manager.allContacts.count) 个联系人和 List。")
+            Text("已扫描“\(account.name)”中的 \(manager.allContacts.count) 个联系人和 List。可在上方切换判定标准，放宽后可能找出更多重复项。")
         } actions: {
             Button("重新扫描") {
                 Task { await manager.loadAccount(account) }
@@ -463,10 +623,25 @@ private struct AccountDuplicatesView: View {
         }
     }
 
+    private func showMergePreview() {
+        let items = manager.makeBulkMergePlan()
+        guard !items.isEmpty else {
+            notice = AppNotice(message: "没有可合并的重复联系人。")
+            return
+        }
+        mergePlan = BulkMergePlan(
+            items: items,
+            scanGeneration: manager.currentScanGeneration
+        )
+    }
+
     @MainActor
-    private func mergeContacts() async {
+    private func mergeContacts(groupIDs: Set<String>, expectedScanGeneration: Int) async {
         do {
-            mergeReport = try await manager.mergeAllDuplicates()
+            mergeReport = try await manager.mergeAllDuplicates(
+                groupIDs: groupIDs,
+                expectedScanGeneration: expectedScanGeneration
+            )
         } catch {
             notice = AppNotice(message: "联系人合并失败：\(error.localizedDescription)")
         }
@@ -508,6 +683,54 @@ private struct DedupSectionHeader: View {
     }
 }
 
+/// Limited access hands the app only the contacts the user hand-picked. Every count
+/// and every "no duplicates" verdict then covers a subset, which for a deduper is
+/// misleading enough to say out loud rather than hide.
+private struct LimitedAccessNotice: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("仅可访问部分联系人", systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.orange)
+
+            Text("你只授权了部分联系人。下面的数量和查重结果都只覆盖这一部分，未授权的联系人不会被扫描，也不会被合并或删除。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button("授予完整通讯录权限") {
+                openContactsPrivacySettings()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// Shown while a scan runs. Scans happen off the main actor, so this actually
+/// spins instead of freezing with the rest of the UI.
+private struct ScanningBanner: View {
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().stroke(.separator))
+        .padding(.top, 8)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+}
+
 private struct MergeProgressRow: View {
     let progress: Double
     let status: String
@@ -532,6 +755,135 @@ private struct MergeProgressRow: View {
 private struct PendingContactImport {
     let data: Data
     let preview: ContactImportPreview
+}
+
+private struct BulkMergePlan: Identifiable {
+    let id = UUID()
+    let items: [BulkMergePlanItem]
+    let scanGeneration: Int
+}
+
+private struct BulkMergePreviewView: View {
+    let accountName: String
+    let items: [BulkMergePlanItem]
+    let onConfirm: (Set<String>) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedIDs: Set<String>
+
+    init(accountName: String, items: [BulkMergePlanItem], onConfirm: @escaping (Set<String>) -> Void) {
+        self.accountName = accountName
+        self.items = items
+        self.onConfirm = onConfirm
+        _selectedIDs = State(initialValue: Set(items.map(\.id)))
+    }
+
+    private var deletionCount: Int {
+        items
+            .filter { selectedIDs.contains($0.id) }
+            .reduce(0) { $0 + $1.removedNames.count }
+    }
+
+    private var isEverythingSelected: Bool {
+        selectedIDs.count == items.count
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(items) { item in
+                        Button {
+                            toggle(item.id)
+                        } label: {
+                            row(for: item)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    HStack {
+                        Text("已选 \(selectedIDs.count) / \(items.count) 组")
+                        Spacer()
+                        Button(isEverythingSelected ? "全不选" : "全选") {
+                            selectedIDs = isEverythingSelected ? [] : Set(items.map(\.id))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .textCase(nil)
+                } footer: {
+                    Text("只处理“\(accountName)”账户。每组保留资料最完整的一项并补齐资料，其余联系人会被删除且不可撤销。建议先导出备份。")
+                }
+            }
+            .navigationTitle("合并预览")
+            .inlineNavigationTitleOnIOS()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("合并并删除 \(deletionCount) 项", role: .destructive) {
+                        dismiss()
+                        onConfirm(selectedIDs)
+                    }
+                    .disabled(selectedIDs.isEmpty)
+                }
+            }
+        }
+        .bulkMergePreviewFrameOnMac()
+    }
+
+    private func toggle(_ id: String) {
+        if selectedIDs.contains(id) {
+            selectedIDs.remove(id)
+        } else {
+            selectedIDs.insert(id)
+        }
+    }
+
+    private func row(for item: BulkMergePlanItem) -> some View {
+        let isSelected = selectedIDs.contains(item.id)
+
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.title3)
+                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(item.title)
+                    .font(.headline)
+
+                Label("保留 \(item.keeperName)", systemImage: "person.crop.circle.badge.checkmark")
+                    .font(.subheadline)
+                    .foregroundStyle(.green)
+
+                if !item.keeperSummary.isEmpty {
+                    Text(item.keeperSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Label(
+                    "删除 \(item.removedNames.count) 项：\(item.removedSummary)",
+                    systemImage: "trash"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.red)
+
+                Label(item.additionSummary, systemImage: "plus.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text("依据：\(item.reasonSummary)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
 }
 
 private struct AppNotice: Identifiable {
@@ -850,6 +1202,24 @@ private extension View {
     func detailTextStyle() -> some View {
         font(.subheadline)
             .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    func presentationDetentsOnIOS() -> some View {
+#if os(iOS)
+        presentationDetents([.large])
+#else
+        self
+#endif
+    }
+
+    @ViewBuilder
+    func bulkMergePreviewFrameOnMac() -> some View {
+#if os(macOS)
+        frame(minWidth: 620, minHeight: 540)
+#else
+        self
+#endif
     }
 
     @ViewBuilder
