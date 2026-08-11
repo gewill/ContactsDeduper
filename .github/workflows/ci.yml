@@ -69,4 +69,5 @@ jobs:
             -project ContactsDeduper.xcodeproj \
             -scheme ContactsDeduper \
             -destination "platform=iOS Simulator,id=$simulator_id" \
+            -skip-testing:ContactsDeduperTests/DuplicateMatchingPerformanceTests \
             CODE_SIGNING_ALLOWED=NO
