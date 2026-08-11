@@ -14,11 +14,11 @@
 		1E1E1E1E1E1E1E1E1E1E1E1E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2D2D2D2D2D2D2D2D2D2D2D2D /* Assets.xcassets */; };
 		1F1F1F1F1F1F1F1F1F1F1F1F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 2D2E2D2E2D2E2D2E2D2E2D2E /* PrivacyInfo.xcprivacy */; };
 		CC0000000000000000000001 /* DuplicateMatchingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000010 /* DuplicateMatchingTests.swift */; };
+		CC0000000000000000000002 /* ContactsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2C2C2C2C2C2C2C2C2C2C2C /* ContactsManager.swift */; };
+		CC0000000000000000000003 /* ContactsBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */; };
 		CC0000000000000000000004 /* DuplicateMatchingPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000012 /* DuplicateMatchingPerformanceTests.swift */; };
 		CC0000000000000000000005 /* ContactsBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000013 /* ContactsBackupTests.swift */; };
 		CC0000000000000000000006 /* ContactMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000014 /* ContactMergeTests.swift */; };
-		CC0000000000000000000002 /* ContactsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2C2C2C2C2C2C2C2C2C2C2C /* ContactsManager.swift */; };
-		CC0000000000000000000003 /* ContactsBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,10 +30,10 @@
 		2E2E2E2E2E2E2E2E2E2E2E2E /* ContactsDeduper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ContactsDeduper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsBackup.swift; sourceTree = "<group>"; };
 		CC0000000000000000000010 /* DuplicateMatchingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateMatchingTests.swift; sourceTree = "<group>"; };
+		CC0000000000000000000011 /* ContactsDeduperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ContactsDeduperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC0000000000000000000012 /* DuplicateMatchingPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateMatchingPerformanceTests.swift; sourceTree = "<group>"; };
 		CC0000000000000000000013 /* ContactsBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsBackupTests.swift; sourceTree = "<group>"; };
 		CC0000000000000000000014 /* ContactMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactMergeTests.swift; sourceTree = "<group>"; };
-		CC0000000000000000000011 /* ContactsDeduperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ContactsDeduperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -339,7 +339,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = RLK76T8Y89;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
@@ -356,6 +356,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ContactsDeduper/Info.plist;
 				"INFOPLIST_FILE[sdk=macosx*]" = "ContactsDeduper/Info-macOS.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -382,7 +383,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = RLK76T8Y89;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
@@ -399,6 +400,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ContactsDeduper/Info.plist;
 				"INFOPLIST_FILE[sdk=macosx*]" = "ContactsDeduper/Info-macOS.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
