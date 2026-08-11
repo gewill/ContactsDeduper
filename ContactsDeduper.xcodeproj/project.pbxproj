@@ -11,6 +11,8 @@
 		1B1B1B1B1B1B1B1B1B1B1B1B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B2B2B2B2B2B2B2B2B2B2B2B /* ContentView.swift */; };
 		1C1C1C1C1C1C1C1C1C1C1C1C /* ContactsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2C2C2C2C2C2C2C2C2C2C2C /* ContactsManager.swift */; };
 		1D1D1D1D1D1D1D1D1D1D1D1D /* ContactsBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */; };
+		1E1E1E1E1E1E1E1E1E1E1E1E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2D2D2D2D2D2D2D2D2D2D2D2D /* Assets.xcassets */; };
+		1F1F1F1F1F1F1F1F1F1F1F1F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 2D2E2D2E2D2E2D2E2D2E2D2E /* PrivacyInfo.xcprivacy */; };
 		CC0000000000000000000001 /* DuplicateMatchingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000010 /* DuplicateMatchingTests.swift */; };
 		CC0000000000000000000004 /* DuplicateMatchingPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000012 /* DuplicateMatchingPerformanceTests.swift */; };
 		CC0000000000000000000005 /* ContactsBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000013 /* ContactsBackupTests.swift */; };
@@ -23,6 +25,8 @@
 		2A2A2A2A2A2A2A2A2A2A2A2A /* ContactsDeduperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsDeduperApp.swift; sourceTree = "<group>"; };
 		2B2B2B2B2B2B2B2B2B2B2B2B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2C2C2C2C2C2C2C2C2C2C2C2C /* ContactsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsManager.swift; sourceTree = "<group>"; };
+		2D2D2D2D2D2D2D2D2D2D2D2D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		2D2E2D2E2D2E2D2E2D2E2D2E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		2E2E2E2E2E2E2E2E2E2E2E2E /* ContactsDeduper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ContactsDeduper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsBackup.swift; sourceTree = "<group>"; };
 		CC0000000000000000000010 /* DuplicateMatchingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateMatchingTests.swift; sourceTree = "<group>"; };
@@ -62,10 +66,12 @@
 		4B4B4B4B4B4B4B4B4B4B4B4B /* ContactsDeduper */ = {
 			isa = PBXGroup;
 			children = (
+				2D2D2D2D2D2D2D2D2D2D2D2D /* Assets.xcassets */,
 				2A2A2A2A2A2A2A2A2A2A2A2A /* ContactsDeduperApp.swift */,
 				2B2B2B2B2B2B2B2B2B2B2B2B /* ContentView.swift */,
 				2C2C2C2C2C2C2C2C2C2C2C2C /* ContactsManager.swift */,
 				2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */,
+				2D2E2D2E2D2E2D2E2D2E2D2E /* PrivacyInfo.xcprivacy */,
 			);
 			path = ContactsDeduper;
 			sourceTree = "<group>";
@@ -169,6 +175,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1E1E1E1E1E1E1E1E1E1E1E1E /* Assets.xcassets in Resources */,
+				1F1F1F1F1F1F1F1F1F1F1F1F /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

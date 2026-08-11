@@ -1,5 +1,7 @@
 # 隐私说明
 
+[简体中文](PRIVACY.md) · [English](PRIVACY.en.md)
+
 生效日期：2026 年 8 月 10 日
 
 ContactsDeduper 是一款本地运行的 iOS 与 macOS 通讯录整理工具。本说明描述应用如何访问、使用和保护联系人数据。
