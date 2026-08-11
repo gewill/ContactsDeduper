@@ -54,3 +54,19 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      - name: Run iOS Simulator unit tests
+        run: |
+          set -euo pipefail
+          simulator_id="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { gsub(/ /, "", $2); print $2; exit }')"
+          if [[ -z "$simulator_id" ]]; then
+            echo "No available iPhone Simulator was found."
+            xcrun simctl list devices available
+            exit 1
+          fi
+
+          xcodebuild test -quiet \
+            -project ContactsDeduper.xcodeproj \
+            -scheme ContactsDeduper \
+            -destination "platform=iOS Simulator,id=$simulator_id" \
+            CODE_SIGNING_ALLOWED=NO
