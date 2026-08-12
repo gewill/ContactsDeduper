@@ -1,6 +1,6 @@
 # Privacy Policy
 
-[English](PRIVACY.en.md) · [简体中文](PRIVACY.md)
+[简体中文](PRIVACY.md) · [繁體中文](PRIVACY.zh-Hant.md) · [English](PRIVACY.en.md) · [日本語](PRIVACY.ja.md) · [한국어](PRIVACY.ko.md) · [Español](PRIVACY.es.md) · [Français](PRIVACY.fr.md) · [Deutsch](PRIVACY.de.md)
 
 Effective date: August 10, 2026
 

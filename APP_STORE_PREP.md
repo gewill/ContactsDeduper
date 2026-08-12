@@ -8,7 +8,8 @@
 - `ContactsDeduper/PrivacyInfo.xcprivacy`：声明不跟踪、不收集数据，并为应用自身的 `UserDefaults` 使用 `CA92.1` required-reason API 理由。
 - `ContactsDeduper/Info.plist` 与 `Info-macOS.plist`：加入 `ITSAppUsesNonExemptEncryption = NO`，声明应用不使用非豁免加密。
 - `Info-macOS.plist`：设置 `LSApplicationCategoryType = public.app-category.utilities`。
-- `PRIVACY.md` / `PRIVACY.en.md`：提供中英文隐私政策，可作为 App Store Connect 的隐私政策页面内容。
+- `PRIVACY*.md`：提供 8 种语言的隐私政策，可作为 App Store Connect 的隐私政策页面内容。
+- `AppStoreMetadata.json`：提供简体中文、繁体中文、英语、日语、韩语、西班牙语、法语和德语的名称、副标题、描述、关键词及隐私政策链接；各语言隐私政策位于对应的 `PRIVACY.*.md`。
 
 ## App Store Connect 建议填写
 
