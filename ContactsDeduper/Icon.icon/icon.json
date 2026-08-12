@@ -4,17 +4,8 @@
   },
   "groups" : [
     {
+      "blur-material" : 0.5,
       "layers" : [
-        {
-          "glass" : true,
-          "image-name" : "01-left-card.svg",
-          "name" : "01-left-card"
-        },
-        {
-          "glass" : true,
-          "image-name" : "02-right-card.svg",
-          "name" : "02-right-card"
-        },
         {
           "glass" : true,
           "image-name" : "03-center-check.svg",
@@ -24,6 +15,16 @@
           "glass" : true,
           "image-name" : "04-link.svg",
           "name" : "04-link"
+        },
+        {
+          "glass" : true,
+          "image-name" : "01-left-card.svg",
+          "name" : "01-left-card"
+        },
+        {
+          "glass" : true,
+          "image-name" : "02-right-card.svg",
+          "name" : "02-right-card"
         }
       ],
       "shadow" : {
