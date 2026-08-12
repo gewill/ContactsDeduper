@@ -24,5 +24,8 @@ npm run check
 Upload `dist/` to Cloudflare Pages. For a connected repository, use `npm run
 build` as the build command and `website/dist` as the output directory.
 
-Privacy content is sourced from the repository's `PRIVACY*.md` files during the
-build. The generated pages must not be edited directly.
+Privacy and Terms of Use content are sourced from the repository's
+`PRIVACY*.md` and `TERMS*.md` files during the build. The generated pages must
+not be edited directly. The Terms page links to Apple's [Licensed Application
+End User License Agreement](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/);
+review app-specific terms with counsel before production use.
