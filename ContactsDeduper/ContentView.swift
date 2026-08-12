@@ -196,19 +196,22 @@ struct ContentView: View {
                 }
             }
 
-            Section("电话格式支持") {
+            Section {
                 Picker("本地号码默认地区", selection: defaultPhoneRegionBinding) {
                     Text("自动（设备地区）").tag("")
                     ForEach(supportedPhoneRegions) { region in
                         Text("\(region.name)（\(region.code)）").tag(region.code)
                     }
                 }
+                .pickerStyle(.menu)
 
-                Text("仅在联系人地址未指定国家或地区时使用；修改后会立即重新判定重复联系人。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                PhoneMatchingScopeNotice()
+                NavigationLink("电话格式支持") {
+                    PhoneMatchingSupportView()
+                }
+            } header: {
+                Text("号码识别")
+            } footer: {
+                Text("默认地区仅用于地址中未指定国家或地区的本地号码；修改后会立即重新判定。")
             }
         }
         .disabled(manager.isLoading)
@@ -227,33 +230,34 @@ struct ContentView: View {
         )
     }
 
-/// Makes the conservative matching boundary visible before users act on scan
-/// results. Explicit international numbers are universal; converting a national
-/// format needs a supported region from the contact address or current device.
-private struct PhoneMatchingScopeNotice: View {
+/// Keeps the account list focused while still exposing the complete matching
+/// boundary before users act on scan results.
+private struct PhoneMatchingSupportView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("完整国际格式适用于所有国家和地区", systemImage: "checkmark.circle.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.green)
+        List {
+            Section("识别范围") {
+                Label("完整国际格式适用于所有国家和地区", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
 
-            Label("本地格式转换仅支持部分地区", systemImage: "exclamationmark.triangle.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.orange)
-
-            DisclosureGroup("查看支持的 \(supportedPhoneRegions.count) 个国家和地区") {
-                Text(supportedPhoneRegions.map(\.name).joined(separator: "、"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 6)
+                Label("本地格式转换仅支持以下地区", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
             }
 
-            Text("其他地区请将号码保存为“+国家码”开头的完整国际格式；否则本地格式与国际格式可能无法识别为同一号码。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Section("支持本地格式的 \(supportedPhoneRegions.count) 个国家和地区") {
+                ForEach(supportedPhoneRegions) { region in
+                    LabeledContent(region.name) {
+                        Text("+\(region.callingCode) · \(region.code)")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Section {
+                Text("其他地区请将号码保存为“+国家码”开头的完整国际格式；否则本地格式与国际格式可能无法识别为同一号码。")
+                    .foregroundStyle(.secondary)
+            }
         }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .contain)
+        .navigationTitle("电话格式支持")
     }
 }
 
