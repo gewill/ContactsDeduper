@@ -197,6 +197,17 @@ struct ContentView: View {
             }
 
             Section("电话格式支持") {
+                Picker("本地号码默认地区", selection: defaultPhoneRegionBinding) {
+                    Text("自动（设备地区）").tag("")
+                    ForEach(supportedPhoneRegions) { region in
+                        Text("\(region.name)（\(region.code)）").tag(region.code)
+                    }
+                }
+
+                Text("仅在联系人地址未指定国家或地区时使用；修改后会立即重新判定重复联系人。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 PhoneMatchingScopeNotice()
             }
         }
@@ -207,17 +218,19 @@ struct ContentView: View {
             }
         }
         .animation(.default, value: manager.isLoading)
-}
+    }
+
+    private var defaultPhoneRegionBinding: Binding<String> {
+        Binding(
+            get: { manager.defaultPhoneRegionCode ?? "" },
+            set: { manager.setDefaultPhoneRegion($0.isEmpty ? nil : $0) }
+        )
+    }
 
 /// Makes the conservative matching boundary visible before users act on scan
 /// results. Explicit international numbers are universal; converting a national
 /// format needs a supported region from the contact address or current device.
 private struct PhoneMatchingScopeNotice: View {
-    private let supportedRegions = [
-        "美国", "加拿大", "中国大陆", "英国", "德国", "日本", "中国台湾", "中国香港",
-        "中国澳门", "新加坡", "澳大利亚", "法国", "西班牙", "意大利", "印度"
-    ]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("完整国际格式适用于所有国家和地区", systemImage: "checkmark.circle.fill")
@@ -228,8 +241,8 @@ private struct PhoneMatchingScopeNotice: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.orange)
 
-            DisclosureGroup("查看支持的 15 个国家和地区") {
-                Text(supportedRegions.joined(separator: "、"))
+            DisclosureGroup("查看支持的 \(supportedPhoneRegions.count) 个国家和地区") {
+                Text(supportedPhoneRegions.map(\.name).joined(separator: "、"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 6)

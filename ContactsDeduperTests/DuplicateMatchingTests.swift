@@ -391,4 +391,20 @@ final class DuplicateMatchingTests: XCTestCase {
             manager.findDuplicates(in: contacts, rule: .phoneOnly, defaultRegionCode: "US").isEmpty
         )
     }
+
+    func testManuallySelectedRegionOverridesNumberShapeInference() {
+        let contacts = [
+            makeContact(given: "甲", phones: ["98765 43210"]),
+            makeContact(given: "乙", phones: ["+91 98765 43210"])
+        ]
+        XCTAssertEqual(
+            manager.findDuplicates(
+                in: contacts,
+                rule: .phoneOnly,
+                defaultRegionCode: "IN",
+                isDefaultRegionAuthoritative: true
+            ).count,
+            1
+        )
+    }
 }

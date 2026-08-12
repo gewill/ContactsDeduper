@@ -210,9 +210,13 @@ private struct ContactPair: Hashable {
     let second: String
 }
 
-private struct PhoneRegionRule: Sendable {
+struct PhoneRegionOption: Identifiable, Hashable, Sendable {
+    let code: String
+    let name: String
     let callingCode: String
     let trunkPrefix: String?
+
+    var id: String { code }
 }
 
 private struct ParsedPhone: Sendable {
@@ -222,23 +226,27 @@ private struct ParsedPhone: Sendable {
     let containsLetters: Bool
 }
 
-private let phoneRegionRules: [String: PhoneRegionRule] = [
-    "US": PhoneRegionRule(callingCode: "1", trunkPrefix: nil),
-    "CA": PhoneRegionRule(callingCode: "1", trunkPrefix: nil),
-    "CN": PhoneRegionRule(callingCode: "86", trunkPrefix: "0"),
-    "GB": PhoneRegionRule(callingCode: "44", trunkPrefix: "0"),
-    "DE": PhoneRegionRule(callingCode: "49", trunkPrefix: "0"),
-    "JP": PhoneRegionRule(callingCode: "81", trunkPrefix: "0"),
-    "TW": PhoneRegionRule(callingCode: "886", trunkPrefix: "0"),
-    "HK": PhoneRegionRule(callingCode: "852", trunkPrefix: nil),
-    "MO": PhoneRegionRule(callingCode: "853", trunkPrefix: nil),
-    "SG": PhoneRegionRule(callingCode: "65", trunkPrefix: nil),
-    "AU": PhoneRegionRule(callingCode: "61", trunkPrefix: "0"),
-    "FR": PhoneRegionRule(callingCode: "33", trunkPrefix: "0"),
-    "ES": PhoneRegionRule(callingCode: "34", trunkPrefix: nil),
-    "IT": PhoneRegionRule(callingCode: "39", trunkPrefix: nil),
-    "IN": PhoneRegionRule(callingCode: "91", trunkPrefix: "0")
+let supportedPhoneRegions: [PhoneRegionOption] = [
+    PhoneRegionOption(code: "US", name: "美国", callingCode: "1", trunkPrefix: nil),
+    PhoneRegionOption(code: "CA", name: "加拿大", callingCode: "1", trunkPrefix: nil),
+    PhoneRegionOption(code: "CN", name: "中国大陆", callingCode: "86", trunkPrefix: "0"),
+    PhoneRegionOption(code: "GB", name: "英国", callingCode: "44", trunkPrefix: "0"),
+    PhoneRegionOption(code: "DE", name: "德国", callingCode: "49", trunkPrefix: "0"),
+    PhoneRegionOption(code: "JP", name: "日本", callingCode: "81", trunkPrefix: "0"),
+    PhoneRegionOption(code: "TW", name: "中国台湾", callingCode: "886", trunkPrefix: "0"),
+    PhoneRegionOption(code: "HK", name: "中国香港", callingCode: "852", trunkPrefix: nil),
+    PhoneRegionOption(code: "MO", name: "中国澳门", callingCode: "853", trunkPrefix: nil),
+    PhoneRegionOption(code: "SG", name: "新加坡", callingCode: "65", trunkPrefix: nil),
+    PhoneRegionOption(code: "AU", name: "澳大利亚", callingCode: "61", trunkPrefix: "0"),
+    PhoneRegionOption(code: "FR", name: "法国", callingCode: "33", trunkPrefix: "0"),
+    PhoneRegionOption(code: "ES", name: "西班牙", callingCode: "34", trunkPrefix: nil),
+    PhoneRegionOption(code: "IT", name: "意大利", callingCode: "39", trunkPrefix: nil),
+    PhoneRegionOption(code: "IN", name: "印度", callingCode: "91", trunkPrefix: "0")
 ]
+
+private let phoneRegionRules = Dictionary(
+    uniqueKeysWithValues: supportedPhoneRegions.map { ($0.code, $0) }
+)
 
 extension CNContact {
     /// `CNContactFormatter` needs private sorting keys that no public
@@ -288,10 +296,12 @@ final class ContactsManager: ObservableObject {
     @Published private(set) var contactListMergeProgress: Double?
     @Published private(set) var contactListMergeStatus: String?
     @Published private(set) var matchRule: DuplicateMatchRule = .dual
+    @Published private(set) var defaultPhoneRegionCode: String?
     @Published var isLoading = false
     @Published var errorMessage: String?
 
     private static let matchRuleDefaultsKey = "duplicateMatchRule"
+    private static let defaultPhoneRegionDefaultsKey = "defaultPhoneRegionCode"
 
     /// Bumped whenever a scan starts. A scan discards its results if another one
     /// began while it was running, so a slow account cannot overwrite a newer one.
@@ -319,6 +329,11 @@ final class ContactsManager: ObservableObject {
     init() {
         let storedRule = UserDefaults.standard.string(forKey: Self.matchRuleDefaultsKey)
         matchRule = storedRule.flatMap(DuplicateMatchRule.init(rawValue:)) ?? .dual
+
+        let storedRegion = UserDefaults.standard.string(forKey: Self.defaultPhoneRegionDefaultsKey)
+        defaultPhoneRegionCode = supportedPhoneRegions.contains { $0.code == storedRegion }
+            ? storedRegion
+            : nil
     }
 
     var isBulkMerging: Bool {
@@ -429,7 +444,36 @@ final class ContactsManager: ObservableObject {
         guard rule != matchRule else { return }
         matchRule = rule
         UserDefaults.standard.set(rule.rawValue, forKey: Self.matchRuleDefaultsKey)
-        duplicateGroups = findDuplicates(in: allContacts, rule: rule)
+        duplicateGroups = findDuplicates(
+            in: allContacts,
+            rule: rule,
+            defaultRegionCode: effectiveDefaultPhoneRegionCode,
+            isDefaultRegionAuthoritative: defaultPhoneRegionCode != nil
+        )
+    }
+
+    func setDefaultPhoneRegion(_ regionCode: String?) {
+        let supportedCode = regionCode.flatMap { candidate in
+            supportedPhoneRegions.first { $0.code == candidate }?.code
+        }
+        guard supportedCode != defaultPhoneRegionCode else { return }
+
+        defaultPhoneRegionCode = supportedCode
+        if let supportedCode {
+            UserDefaults.standard.set(supportedCode, forKey: Self.defaultPhoneRegionDefaultsKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.defaultPhoneRegionDefaultsKey)
+        }
+        duplicateGroups = findDuplicates(
+            in: allContacts,
+            rule: matchRule,
+            defaultRegionCode: effectiveDefaultPhoneRegionCode,
+            isDefaultRegionAuthoritative: defaultPhoneRegionCode != nil
+        )
+    }
+
+    private var effectiveDefaultPhoneRegionCode: String? {
+        defaultPhoneRegionCode ?? Locale.current.region?.identifier
     }
 
     func makeBackupDocument() async throws -> ContactsBackupDocument {
@@ -820,12 +864,19 @@ final class ContactsManager: ObservableObject {
     /// synchronous and, with image data, slow — no longer freezes the UI.
     private nonisolated func scanAccount(
         _ account: ContactAccount,
-        rule: DuplicateMatchRule
+        rule: DuplicateMatchRule,
+        defaultRegionCode: String?,
+        isDefaultRegionAuthoritative: Bool
     ) async throws -> AccountScan {
         let contacts = try fetchContacts(in: account.id)
         return AccountScan(
             contacts: contacts,
-            duplicateGroups: findDuplicates(in: contacts, rule: rule),
+            duplicateGroups: findDuplicates(
+                in: contacts,
+                rule: rule,
+                defaultRegionCode: defaultRegionCode,
+                isDefaultRegionAuthoritative: isDefaultRegionAuthoritative
+            ),
             duplicateContactLists: try fetchDuplicateContactLists(in: account)
         )
     }
@@ -918,7 +969,12 @@ final class ContactsManager: ObservableObject {
 
         scanGeneration += 1
         let generation = scanGeneration
-        let scan = try await scanAccount(activeAccount, rule: matchRule)
+        let scan = try await scanAccount(
+            activeAccount,
+            rule: matchRule,
+            defaultRegionCode: effectiveDefaultPhoneRegionCode,
+            isDefaultRegionAuthoritative: defaultPhoneRegionCode != nil
+        )
         // A newer scan started while this one was running; its results win.
         guard generation == scanGeneration, let currentAccount = self.activeAccount else { return }
 
@@ -1055,7 +1111,8 @@ final class ContactsManager: ObservableObject {
     nonisolated func findDuplicates(
         in contacts: [CNContact],
         rule: DuplicateMatchRule,
-        defaultRegionCode: String? = Locale.current.region?.identifier
+        defaultRegionCode: String? = Locale.current.region?.identifier,
+        isDefaultRegionAuthoritative: Bool = false
     ) -> [DuplicateGroup] {
         var buckets: [String: Set<String>] = [:]
         var byID: [String: CNContact] = [:]
@@ -1070,10 +1127,15 @@ final class ContactsManager: ObservableObject {
             byID[contact.identifier] = contact
             displayNames[contact.identifier] = contact.displayName
 
-            let phoneRegion = contactPhoneRegionCode(contact, fallback: defaultRegionCode)
+            let contactRegion = contactPhoneRegionCode(contact)
+            let phoneRegion = contactRegion ?? defaultRegionCode
             for labeledPhone in contact.phoneNumbers {
                 let rawPhone = labeledPhone.value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard let phone = phoneMatchKey(rawPhone, defaultRegionCode: phoneRegion) else { continue }
+                guard let phone = phoneMatchKey(
+                    rawPhone,
+                    defaultRegionCode: phoneRegion,
+                    isRegionAuthoritative: contactRegion != nil || isDefaultRegionAuthoritative
+                ) else { continue }
                 let key = "phone:\(phone)"
                 buckets[key, default: []].insert(contact.identifier)
                 kindByKey[key] = .phone
@@ -1444,7 +1506,8 @@ final class ContactsManager: ObservableObject {
     /// region. Unsupported letters and fewer than seven digits are never evidence.
     nonisolated func phoneMatchKey(
         _ value: String,
-        defaultRegionCode: String? = Locale.current.region?.identifier
+        defaultRegionCode: String? = Locale.current.region?.identifier,
+        isRegionAuthoritative: Bool = false
     ) -> String? {
         let parsed = parsePhone(value)
         guard !parsed.containsLetters, parsed.digits.count >= 7 else { return nil }
@@ -1452,24 +1515,38 @@ final class ContactsManager: ObservableObject {
         let baseKey: String
         if parsed.isExplicitInternational {
             baseKey = "+\(parsed.digits)"
+        } else if isRegionAuthoritative {
+            if let regionCode = normalizedRegionCode(defaultRegionCode),
+               let rule = phoneRegionRules[regionCode] {
+                baseKey = regionalPhoneKey(parsed.digits, rule: rule)
+            } else {
+                baseKey = "national:\(parsed.digits)"
+            }
         } else if isChineseMobile(parsed.digits) {
             baseKey = "+86\(parsed.digits)"
         } else if isNANPNumber(parsed.digits) {
             baseKey = "+1\(parsed.digits)"
         } else if let regionCode = normalizedRegionCode(defaultRegionCode),
                   let rule = phoneRegionRules[regionCode] {
-            var nationalNumber = parsed.digits
-            if let trunkPrefix = rule.trunkPrefix,
-               nationalNumber.hasPrefix(trunkPrefix),
-               nationalNumber.count > trunkPrefix.count + 6 {
-                nationalNumber.removeFirst(trunkPrefix.count)
-            }
-            baseKey = "+\(rule.callingCode)\(nationalNumber)"
+            baseKey = regionalPhoneKey(parsed.digits, rule: rule)
         } else {
             baseKey = "national:\(parsed.digits)"
         }
 
         return baseKey + parsed.extensionDigits.map { ";ext=\($0)" }.orEmpty
+    }
+
+    private nonisolated func regionalPhoneKey(
+        _ digits: String,
+        rule: PhoneRegionOption
+    ) -> String {
+        var nationalNumber = digits
+        if let trunkPrefix = rule.trunkPrefix,
+           nationalNumber.hasPrefix(trunkPrefix),
+           nationalNumber.count > trunkPrefix.count + 6 {
+            nationalNumber.removeFirst(trunkPrefix.count)
+        }
+        return "+\(rule.callingCode)\(nationalNumber)"
     }
 
     private nonisolated func parsePhone(_ value: String) -> ParsedPhone {
@@ -1501,15 +1578,11 @@ final class ContactsManager: ObservableObject {
         return region == "UK" ? "GB" : region
     }
 
-    private nonisolated func contactPhoneRegionCode(
-        _ contact: CNContact,
-        fallback: String?
-    ) -> String? {
+    private nonisolated func contactPhoneRegionCode(_ contact: CNContact) -> String? {
         contact.postalAddresses
             .lazy
             .map { $0.value.isoCountryCode.trimmingCharacters(in: .whitespacesAndNewlines) }
             .first { !$0.isEmpty }
-            ?? fallback
     }
 
     private nonisolated func isChineseMobile(_ digits: String) -> Bool {

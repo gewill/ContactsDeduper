@@ -97,7 +97,7 @@ GitHub Actions builds and runs the full unit-test suite on macOS, and runs the i
 
 ## Known limitations
 
-- Full international numbers (`+country code`) work in every country and region. Local-format conversion currently covers the United States, Canada, mainland China, the United Kingdom, Germany, Japan, Taiwan, Hong Kong, Macao, Singapore, Australia, France, Spain, Italy, and India. Local numbers elsewhere may not match their international form without region context.
+- Full international numbers (`+country code`) work in every country and region. Local-format conversion currently covers the United States, Canada, mainland China, the United Kingdom, Germany, Japan, Taiwan, Hong Kong, Macao, Singapore, Australia, France, Spain, Italy, and India. You can manually choose the default region for local numbers on the home screen; an explicit country or region in a contact's address still takes priority. Local numbers elsewhere may not match their international form without region context.
 - JSON backups are not encrypted; treat exported files as sensitive data.
 
 ## License
