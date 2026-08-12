@@ -7,19 +7,19 @@ struct DuplicateGroup: Identifiable {
     let contacts: [CNContact]
 
     var displayName: String {
-        contacts.first?.displayName ?? "未命名联系人"
+        contacts.first?.displayName ?? String(localized: "未命名联系人")
     }
 
     var detail: String {
-        "\(contacts.count) 个联系人 · \(reasons.count) 条依据"
+        String(localized: "\(contacts.count) 个联系人 · \(reasons.count) 条依据")
     }
 
     var reasonSummary: String {
-        guard let firstReason = reasons.first else { return "疑似重复" }
+        guard let firstReason = reasons.first else { return String(localized: "疑似重复") }
         if reasons.count == 1 {
             return firstReason.description
         }
-        return "\(firstReason.description)等 \(reasons.count) 条依据"
+        return String(localized: "\(firstReason.description)等 \(reasons.count) 条依据")
     }
 }
 
@@ -36,7 +36,7 @@ struct DuplicateReason: Identifiable {
 
         return countsByName
             .map { name, count in
-                count == 1 ? name : "\(name)（\(count) 个）"
+                count == 1 ? name : String(localized: "\(name)（\(count) 个）")
             }
             .sorted()
             .joined(separator: "、")
@@ -74,7 +74,7 @@ struct DuplicateContactList: Identifiable {
     }
 
     var detail: String {
-        "\(groups.count) 个 List · \(uniqueMemberCount) 位联系人"
+        String(localized: "\(groups.count) 个 List · \(uniqueMemberCount) 位联系人")
     }
 }
 
@@ -122,39 +122,39 @@ enum DuplicateMatchRule: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .dual:
-            return "两项相同"
+            return String(localized: "两项相同")
         case .any:
-            return "任一项相同"
+            return String(localized: "任一项相同")
         case .nameOnly:
-            return "仅名称相同"
+            return String(localized: "仅名称相同")
         case .phoneOnly:
-            return "仅电话相同"
+            return String(localized: "仅电话相同")
         }
     }
 
     var shortTitle: String {
         switch self {
         case .dual:
-            return "两项"
+            return String(localized: "两项")
         case .any:
-            return "任一项"
+            return String(localized: "任一项")
         case .nameOnly:
-            return "仅名称"
+            return String(localized: "仅名称")
         case .phoneOnly:
-            return "仅电话"
+            return String(localized: "仅电话")
         }
     }
 
     var detail: String {
         switch self {
         case .dual:
-            return "名称、电话、邮箱中至少两项同时相同才算重复"
+            return String(localized: "名称、电话、邮箱中至少两项同时相同才算重复")
         case .any:
-            return "名称、电话或邮箱任意一项相同就算重复"
+            return String(localized: "名称、电话或邮箱任意一项相同就算重复")
         case .nameOnly:
-            return "只看名称，公司类联系人按公司名比对"
+            return String(localized: "只看名称，公司类联系人按公司名比对")
         case .phoneOnly:
-            return "只看电话，忽略名称与邮箱"
+            return String(localized: "只看电话，忽略名称与邮箱")
         }
     }
 
@@ -190,7 +190,9 @@ struct BulkMergePlanItem: Identifiable {
     }
 
     var additionSummary: String {
-        additions.isEmpty ? "无新增资料" : "补齐 \(additions.joined(separator: " · "))"
+        additions.isEmpty
+            ? String(localized: "无新增资料")
+            : String(localized: "补齐 \(additions.joined(separator: " · "))")
     }
 }
 
@@ -200,7 +202,7 @@ enum ContactsManagerError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .staleBulkMergePreview:
-            return "通讯录在预览后发生变化，请重新打开合并预览。"
+            return String(localized: "通讯录在预览后发生变化，请重新打开合并预览。")
         }
     }
 }
@@ -217,11 +219,13 @@ extension CNContact {
     static let displayNameDescriptor = CNContactFormatter.descriptorForRequiredKeys(for: .fullName)
 
     var displayName: String {
-        guard areKeysAvailable([Self.displayNameDescriptor]) else { return "未命名联系人" }
+        guard areKeysAvailable([Self.displayNameDescriptor]) else {
+            return String(localized: "未命名联系人")
+        }
         return CNContactFormatter.string(from: self, style: .fullName)?
             .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             ?? organizationName.nilIfEmpty
-            ?? "未命名联系人"
+            ?? String(localized: "未命名联系人")
     }
 
     var phoneSummary: String {
@@ -570,7 +574,7 @@ final class ContactsManager: ObservableObject {
             try store.execute(request)
             await refresh()
         } catch {
-            errorMessage = "合并失败：\(error.localizedDescription)"
+            errorMessage = String(localized: "合并失败：\(error.localizedDescription)")
         }
     }
 
@@ -623,7 +627,7 @@ final class ContactsManager: ObservableObject {
         let contactCountBefore = allContacts.count
 
         bulkMergeProgress = 0
-        bulkMergeStatus = "正在准备合并"
+        bulkMergeStatus = String(localized: "正在准备合并")
         defer {
             bulkMergeProgress = nil
             bulkMergeStatus = nil
@@ -643,12 +647,12 @@ final class ContactsManager: ObservableObject {
             }
             request.update(mutableKeeper)
 
-            bulkMergeStatus = "正在整理第 \(index + 1) / \(groups.count) 组"
+            bulkMergeStatus = String(localized: "正在整理第 \(index + 1) / \(groups.count) 组")
             bulkMergeProgress = Double(index + 1) / Double(groups.count) * 0.85
             await Task.yield()
         }
 
-        bulkMergeStatus = "正在写入通讯录"
+        bulkMergeStatus = String(localized: "正在写入通讯录")
         bulkMergeProgress = 0.92
         await Task.yield()
 
@@ -659,7 +663,7 @@ final class ContactsManager: ObservableObject {
             throw error
         }
 
-        bulkMergeStatus = "正在重新扫描"
+        bulkMergeStatus = String(localized: "正在重新扫描")
         bulkMergeProgress = 0.98
         await Task.yield()
 
@@ -692,7 +696,7 @@ final class ContactsManager: ObservableObject {
         }
 
         contactListMergeProgress = 0
-        contactListMergeStatus = "正在准备 List 合并"
+        contactListMergeStatus = String(localized: "正在准备 List 合并")
         defer {
             contactListMergeProgress = nil
             contactListMergeStatus = nil
@@ -720,12 +724,12 @@ final class ContactsManager: ObservableObject {
                 deletedListCount += 1
             }
 
-            contactListMergeStatus = "正在整理第 \(index + 1) / \(duplicateLists.count) 组 List"
+            contactListMergeStatus = String(localized: "正在整理第 \(index + 1) / \(duplicateLists.count) 组 List")
             contactListMergeProgress = Double(index + 1) / Double(duplicateLists.count) * 0.85
             await Task.yield()
         }
 
-        contactListMergeStatus = "正在写入通讯录"
+        contactListMergeStatus = String(localized: "正在写入通讯录")
         contactListMergeProgress = 0.92
         await Task.yield()
 
@@ -736,7 +740,7 @@ final class ContactsManager: ObservableObject {
             throw error
         }
 
-        contactListMergeStatus = "正在重新扫描"
+        contactListMergeStatus = String(localized: "正在重新扫描")
         contactListMergeProgress = 0.98
         await Task.yield()
         try await reloadActiveAccount()
@@ -756,7 +760,7 @@ final class ContactsManager: ObservableObject {
             try store.execute(request)
             await refresh()
         } catch {
-            errorMessage = "删除失败：\(error.localizedDescription)"
+            errorMessage = String(localized: "删除失败：\(error.localizedDescription)")
         }
     }
 
@@ -1000,15 +1004,15 @@ final class ContactsManager: ObservableObject {
     private nonisolated func containerTypeName(_ type: CNContainerType) -> String {
         switch type {
         case .local:
-            return "本机"
+            return String(localized: "本机")
         case .exchange:
             return "Exchange"
         case .cardDAV:
             return "CardDAV"
         case .unassigned:
-            return "其他账户"
+            return String(localized: "其他账户")
         @unknown default:
-            return "其他账户"
+            return String(localized: "其他账户")
         }
     }
 
@@ -1107,7 +1111,7 @@ final class ContactsManager: ObservableObject {
             for email in emails {
                 let key = "email:\(email)"
                 buckets[key, default: []].insert(contact.identifier)
-                reasonByKey[key] = "相同邮箱 \(email)"
+                reasonByKey[key] = String(localized: "相同邮箱 \(email)")
                 kindByKey[key] = .email
             }
 
@@ -1190,9 +1194,9 @@ final class ContactsManager: ObservableObject {
                     let rawValues = Set(
                         sharedIDs.flatMap { phoneDisplaysByKey[key]?[$0] ?? [] }
                     ).sorted()
-                    description = "相同电话 \(rawValues.joined(separator: " / "))"
+                    description = String(localized: "相同电话 \(rawValues.joined(separator: " / "))")
                 } else {
-                    description = reasonByKey[key] ?? "疑似重复"
+                    description = reasonByKey[key] ?? String(localized: "疑似重复")
                 }
                 reasonsByRoot[rootID, default: []].append(
                     DuplicateReason(
@@ -1375,27 +1379,27 @@ final class ContactsManager: ObservableObject {
             }
         }
 
-        appendGrowth("电话", keeper.phoneNumbers.count, merged.phoneNumbers.count)
-        appendGrowth("邮箱", keeper.emailAddresses.count, merged.emailAddresses.count)
-        appendGrowth("地址", keeper.postalAddresses.count, merged.postalAddresses.count)
-        appendGrowth("网址", keeper.urlAddresses.count, merged.urlAddresses.count)
-        appendGrowth("纪念日", keeper.dates.count, merged.dates.count)
-        appendGrowth("关系", keeper.contactRelations.count, merged.contactRelations.count)
-        appendGrowth("社交", keeper.socialProfiles.count, merged.socialProfiles.count)
+        appendGrowth(String(localized: "电话"), keeper.phoneNumbers.count, merged.phoneNumbers.count)
+        appendGrowth(String(localized: "邮箱"), keeper.emailAddresses.count, merged.emailAddresses.count)
+        appendGrowth(String(localized: "地址"), keeper.postalAddresses.count, merged.postalAddresses.count)
+        appendGrowth(String(localized: "网址"), keeper.urlAddresses.count, merged.urlAddresses.count)
+        appendGrowth(String(localized: "纪念日"), keeper.dates.count, merged.dates.count)
+        appendGrowth(String(localized: "关系"), keeper.contactRelations.count, merged.contactRelations.count)
+        appendGrowth(String(localized: "社交"), keeper.socialProfiles.count, merged.socialProfiles.count)
         appendGrowth(
-            "即时通讯",
+            String(localized: "即时通讯"),
             keeper.instantMessageAddresses.count,
             merged.instantMessageAddresses.count
         )
 
         if keeper.birthday == nil, merged.birthday != nil {
-            summaries.append("生日")
+            summaries.append(String(localized: "生日"))
         }
         if keeper.nonGregorianBirthday == nil, merged.nonGregorianBirthday != nil {
-            summaries.append("农历生日")
+            summaries.append(String(localized: "农历生日"))
         }
         if !keeper.imageDataAvailable, merged.imageData != nil {
-            summaries.append("头像")
+            summaries.append(String(localized: "头像"))
         }
 
         let textAdditions = zip(textFields(of: keeper), textFields(of: merged))
@@ -1409,19 +1413,19 @@ final class ContactsManager: ObservableObject {
 
     private nonisolated func textFields(of contact: CNContact) -> [(label: String, value: String)] {
         [
-            ("姓名前缀", contact.namePrefix),
-            ("名", contact.givenName),
-            ("姓", contact.familyName),
-            ("中间名", contact.middleName),
-            ("曾用姓", contact.previousFamilyName),
-            ("姓名后缀", contact.nameSuffix),
-            ("昵称", contact.nickname),
-            ("拼音名", contact.phoneticGivenName),
-            ("拼音中间名", contact.phoneticMiddleName),
-            ("拼音姓", contact.phoneticFamilyName),
-            ("公司", contact.organizationName),
-            ("部门", contact.departmentName),
-            ("职务", contact.jobTitle)
+            (String(localized: "姓名前缀"), contact.namePrefix),
+            (String(localized: "名"), contact.givenName),
+            (String(localized: "姓"), contact.familyName),
+            (String(localized: "中间名"), contact.middleName),
+            (String(localized: "曾用姓"), contact.previousFamilyName),
+            (String(localized: "姓名后缀"), contact.nameSuffix),
+            (String(localized: "昵称"), contact.nickname),
+            (String(localized: "拼音名"), contact.phoneticGivenName),
+            (String(localized: "拼音中间名"), contact.phoneticMiddleName),
+            (String(localized: "拼音姓"), contact.phoneticFamilyName),
+            (String(localized: "公司"), contact.organizationName),
+            (String(localized: "部门"), contact.departmentName),
+            (String(localized: "职务"), contact.jobTitle)
         ]
     }
 
@@ -1467,12 +1471,12 @@ final class ContactsManager: ObservableObject {
             .joined()
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if !personName.isEmpty {
-            return (personName.lowercased(), "相同姓名 \(displayName ?? contact.displayName)")
+            return (personName.lowercased(), String(localized: "相同姓名 \(displayName ?? contact.displayName)"))
         }
 
         let organizationName = contact.organizationName
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !organizationName.isEmpty else { return nil }
-        return (organizationName.lowercased(), "相同公司 \(organizationName)")
+        return (organizationName.lowercased(), String(localized: "相同公司 \(organizationName)"))
     }
 }

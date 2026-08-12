@@ -27,6 +27,14 @@ jobs:
           xcodebuild -version
           xcode-select -p
 
+      - name: Validate localization resources
+        run: |
+          set -euo pipefail
+          plutil -convert xml1 -o /dev/null AppStoreMetadata.json
+          while IFS= read -r -d '' file; do
+            plutil -lint "$file"
+          done < <(find ContactsDeduper -type f \( -name 'Localizable.strings' -o -name 'InfoPlist.strings' \) -print0)
+
       - name: Build macOS app
         run: |
           xcodebuild -quiet \

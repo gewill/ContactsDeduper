@@ -6,7 +6,7 @@
 
 [简体中文](README.md) · [English](README.en.md)
 
-[隐私说明](PRIVACY.md) · [安全审查](SECURITY_REVIEW.md) · [MIT 许可证](LICENSE)
+[隐私说明（8 种语言）](PRIVACY.md) · [安全审查](SECURITY_REVIEW.md) · [MIT 许可证](LICENSE)
 
 ## 功能
 
@@ -20,6 +20,7 @@
 - 将通讯录导出为版本化 JSON 备份，并安全恢复缺失联系人或头像。
 - 支持删除全部联系人，执行前需要明确确认。
 - 已包含 AppIcon、隐私清单和出口合规声明，可按清单准备 App Store Connect 上架资料。
+- 界面支持简体中文、繁体中文、英语、日语、韩语、西班牙语、法语和德语，并自动跟随系统语言。
 
 ## 查重规则
 
@@ -94,6 +95,7 @@ GitHub Actions 会在 macOS 上执行构建和完整单元测试，并在 iOS �
 - `ContactsDeduperTests/`：查重、合并、备份及性能测试。
 - `ContactsDeduper/Info.plist`、`ContactsDeduper/Info-macOS.plist`：平台权限与应用配置。
 - `APP_STORE_PREP.md`：App Store Connect 分类、隐私和上传前检查清单。
+- `AppStoreMetadata.json`：8 种商店语言的元数据与对应隐私政策链接。
 
 ## 已知限制
 

@@ -106,12 +106,12 @@ struct ContentView: View {
                 switch result {
                 case .success(let url):
                     notice = AppNotice(
-                        message: "已导出 \(exportedContactCount) 个联系人到 \(url.lastPathComponent)。"
+                        message: String(localized: "已导出 \(exportedContactCount) 个联系人到 \(url.lastPathComponent)。")
                     )
                 case .failure(let error) where isUserCancellation(error):
                     break
                 case .failure(let error):
-                    notice = AppNotice(message: "导出失败：\(error.localizedDescription)")
+                    notice = AppNotice(message: String(localized: "导出失败：\(error.localizedDescription)"))
                 }
             }
             .fileImporter(isPresented: $isImporting, allowedContentTypes: [.item]) { result in
@@ -204,7 +204,7 @@ struct ContentView: View {
                 Picker("本地号码默认地区", selection: defaultPhoneRegionBinding) {
                     Text("自动（设备地区）").tag(String?.none)
                     ForEach(supportedPhoneRegions) { region in
-                        Text("\(region.name)（\(region.code)）").tag(Optional(region.code))
+                        Text("\(region.localizedName)（\(region.code)）").tag(Optional(region.code))
                     }
                 }
                 .pickerStyle(.menu)
@@ -221,7 +221,7 @@ struct ContentView: View {
         .disabled(manager.isLoading)
         .overlay(alignment: .top) {
             if manager.isLoading {
-                ScanningBanner(title: "正在扫描通讯录")
+                ScanningBanner(title: String(localized: "正在扫描通讯录"))
             }
         }
         .animation(.default, value: manager.isLoading)
@@ -249,7 +249,7 @@ struct ContentView: View {
 
                 Section("支持本地格式的 \(supportedPhoneRegions.count) 个国家和地区") {
                     ForEach(supportedPhoneRegions) { region in
-                        LabeledContent(region.name) {
+                        LabeledContent(region.localizedName) {
                             Text("+\(region.callingCode) · \(region.code)")
                                 .foregroundStyle(.secondary)
                         }
@@ -295,10 +295,10 @@ struct ContentView: View {
     }
 
     private var importDialogTitle: String {
-        guard let pendingImport else { return "确认恢复通讯录？" }
+        guard let pendingImport else { return String(localized: "确认恢复通讯录？") }
         return pendingImport.preview.contactsToAdd == 0
-            ? "备份中的联系人已存在"
-            : "恢复 \(pendingImport.preview.contactsToAdd) 个联系人？"
+            ? String(localized: "备份中的联系人已存在")
+            : String(localized: "恢复 \(pendingImport.preview.contactsToAdd) 个联系人？")
     }
 
     private var backupFilename: String {
@@ -317,7 +317,7 @@ struct ContentView: View {
                     .contacts.count
                 isExporting = true
             } catch {
-                notice = AppNotice(message: "无法创建备份：\(error.localizedDescription)")
+                notice = AppNotice(message: String(localized: "无法创建备份：\(error.localizedDescription)"))
             }
         }
     }
@@ -351,7 +351,7 @@ struct ContentView: View {
                 pendingImport = PendingContactImport(data: data, preview: preview)
                 showImportConfirmation = true
             } catch {
-                notice = AppNotice(message: "无法导入备份：\(error.localizedDescription)")
+                notice = AppNotice(message: String(localized: "无法导入备份：\(error.localizedDescription)"))
             }
         }
     }
@@ -360,9 +360,9 @@ struct ContentView: View {
     private func deleteAllContacts() async {
         do {
             let deletedCount = try await manager.deleteAllContacts()
-            notice = AppNotice(message: "已删除 \(deletedCount) 个联系人。可通过之前导出的备份恢复。")
+            notice = AppNotice(message: String(localized: "已删除 \(deletedCount) 个联系人。可通过之前导出的备份恢复。"))
         } catch {
-            notice = AppNotice(message: "删除失败：\(error.localizedDescription)")
+            notice = AppNotice(message: String(localized: "删除失败：\(error.localizedDescription)"))
         }
     }
 
@@ -370,13 +370,13 @@ struct ContentView: View {
     private func restoreContacts(from pending: PendingContactImport) async {
         do {
             let result = try await manager.importBackup(data: pending.data)
-            var message = "已恢复 \(result.addedCount) 个联系人，跳过 \(result.skippedCount) 个已有联系人。"
+            var message = String(localized: "已恢复 \(result.addedCount) 个联系人，跳过 \(result.skippedCount) 个已有联系人。")
             if result.restoredImageCount > 0 {
-                message += " 同时补回 \(result.restoredImageCount) 张头像。"
+                message += String(localized: " 同时补回 \(result.restoredImageCount) 张头像。")
             }
             notice = AppNotice(message: message)
         } catch {
-            notice = AppNotice(message: "恢复失败，现有联系人未被删除：\(error.localizedDescription)")
+            notice = AppNotice(message: String(localized: "恢复失败，现有联系人未被删除：\(error.localizedDescription)"))
         }
         pendingImport = nil
     }
@@ -432,18 +432,18 @@ struct ContentView: View {
     private var permissionTitle: String {
         switch manager.permissionState {
         case .restricted:
-            return "通讯录访问被限制"
+            return String(localized: "通讯录访问被限制")
         default:
-            return "需要通讯录权限"
+            return String(localized: "需要通讯录权限")
         }
     }
 
     private var permissionDescription: String {
         switch manager.permissionState {
         case .notDetermined:
-            return "ContactsDeduper 需要读取通讯录才能查找重复联系人。全部处理都在本机完成，不会上传。"
+            return String(localized: "ContactsDeduper 需要读取通讯录才能查找重复联系人。全部处理都在本机完成，不会上传。")
         case .restricted:
-            return "屏幕使用时间或设备管理配置禁止访问通讯录，需要由管理者解除限制，在设置中打开开关无效。"
+            return String(localized: "屏幕使用时间或设备管理配置禁止访问通讯录，需要由管理者解除限制，在设置中打开开关无效。")
         default:
             return settingsPathHint
         }
@@ -451,11 +451,11 @@ struct ContentView: View {
 
     private var settingsPathHint: String {
 #if os(iOS)
-        return "通讯录访问已被拒绝。前往「设置 › ContactsDeduper › 通讯录」打开开关，回到应用后会自动重新扫描。"
+        return String(localized: "通讯录访问已被拒绝。前往「设置 › ContactsDeduper › 通讯录」打开开关，回到应用后会自动重新扫描。")
 #else
         // macOS caches the decision for the life of the process, so no amount of
         // re-checking helps — the app has to start again.
-        return "通讯录访问已被拒绝。前往「系统设置 › 隐私与安全性 › 通讯录」勾选 ContactsDeduper，然后重新打开应用，权限才会生效。"
+        return String(localized: "通讯录访问已被拒绝。前往「系统设置 › 隐私与安全性 › 通讯录」勾选 ContactsDeduper，然后重新打开应用，权限才会生效。")
 #endif
     }
 }
@@ -482,7 +482,7 @@ private struct AccountDuplicatesView: View {
         // not blank the list out from under the user.
         .overlay(alignment: .top) {
             if manager.isLoading && !manager.allContacts.isEmpty {
-                ScanningBanner(title: "正在重新扫描")
+                ScanningBanner(title: String(localized: "正在重新扫描"))
             }
         }
         .animation(.default, value: manager.isLoading)
@@ -586,7 +586,7 @@ private struct AccountDuplicatesView: View {
                     if let progress = manager.contactListMergeProgress {
                         MergeProgressRow(
                             progress: progress,
-                            status: manager.contactListMergeStatus ?? "正在合并 List"
+                            status: manager.contactListMergeStatus ?? String(localized: "正在合并 List")
                         )
                     }
 
@@ -609,9 +609,9 @@ private struct AccountDuplicatesView: View {
                     }
                 } header: {
                     DedupSectionHeader(
-                        title: "重复 List",
+                        title: String(localized: "重复 List"),
                         count: manager.duplicateContactLists.count,
-                        buttonTitle: "合并全部",
+                        buttonTitle: String(localized: "合并全部"),
                         systemImage: "rectangle.stack.badge.plus",
                         isDisabled: isMerging || manager.duplicateContactLists.isEmpty
                     ) {
@@ -625,7 +625,7 @@ private struct AccountDuplicatesView: View {
                     if let progress = manager.bulkMergeProgress {
                         MergeProgressRow(
                             progress: progress,
-                            status: manager.bulkMergeStatus ?? "正在合并联系人"
+                            status: manager.bulkMergeStatus ?? String(localized: "正在合并联系人")
                         )
                     }
 
@@ -656,9 +656,9 @@ private struct AccountDuplicatesView: View {
                     }
                 } header: {
                     DedupSectionHeader(
-                        title: "重复联系人",
+                        title: String(localized: "重复联系人"),
                         count: manager.duplicateGroups.count,
-                        buttonTitle: "一键合并",
+                        buttonTitle: String(localized: "一键合并"),
                         systemImage: "person.2.badge.gearshape",
                         isDisabled: isMerging || manager.isLoading || manager.duplicateGroups.isEmpty
                     ) {
@@ -686,7 +686,7 @@ private struct AccountDuplicatesView: View {
     private func showMergePreview() {
         let items = manager.makeBulkMergePlan()
         guard !items.isEmpty else {
-            notice = AppNotice(message: "没有可合并的重复联系人。")
+            notice = AppNotice(message: String(localized: "没有可合并的重复联系人。"))
             return
         }
         mergePlan = BulkMergePlan(
@@ -703,7 +703,7 @@ private struct AccountDuplicatesView: View {
                 expectedScanGeneration: expectedScanGeneration
             )
         } catch {
-            notice = AppNotice(message: "联系人合并失败：\(error.localizedDescription)")
+            notice = AppNotice(message: String(localized: "联系人合并失败：\(error.localizedDescription)"))
         }
     }
 
@@ -712,10 +712,10 @@ private struct AccountDuplicatesView: View {
         do {
             let result = try await manager.mergeAllDuplicateContactLists()
             notice = AppNotice(
-                message: "已合并 \(result.mergedSetCount) 组同名 List，删除 \(result.deletedListCount) 个重复 List，并补充 \(result.addedMemberCount) 位成员。"
+                message: String(localized: "已合并 \(result.mergedSetCount) 组同名 List，删除 \(result.deletedListCount) 个重复 List，并补充 \(result.addedMemberCount) 位成员。")
             )
         } catch {
-            notice = AppNotice(message: "List 合并失败：\(error.localizedDescription)")
+            notice = AppNotice(message: String(localized: "List 合并失败：\(error.localizedDescription)"))
         }
     }
 }
@@ -864,7 +864,7 @@ private struct BulkMergePreviewView: View {
                     HStack {
                         Text("已选 \(selectedIDs.count) / \(items.count) 组")
                         Spacer()
-                        Button(isEverythingSelected ? "全不选" : "全选") {
+                        Button(isEverythingSelected ? String(localized: "全不选") : String(localized: "全选")) {
                             selectedIDs = isEverythingSelected ? [] : Set(items.map(\.id))
                         }
                         .buttonStyle(.bordered)
@@ -976,10 +976,10 @@ private struct MergeReportView: View {
                         columns: [GridItem(.flexible()), GridItem(.flexible())],
                         spacing: 12
                     ) {
-                        ReportMetric(title: "已合并", value: "\(report.mergedGroupCount) 组", systemImage: "person.2.fill")
-                        ReportMetric(title: "已清理", value: "\(report.deletedContactCount) 项", systemImage: "trash.fill")
-                        ReportMetric(title: "剩余重复", value: "\(report.remainingDuplicateGroupCount) 组", systemImage: "checkmark.circle")
-                        ReportMetric(title: "处理耗时", value: durationText, systemImage: "clock.fill")
+                        ReportMetric(title: String(localized: "已合并"), value: String(localized: "\(report.mergedGroupCount) 组"), systemImage: "person.2.fill")
+                        ReportMetric(title: String(localized: "已清理"), value: String(localized: "\(report.deletedContactCount) 项"), systemImage: "trash.fill")
+                        ReportMetric(title: String(localized: "剩余重复"), value: String(localized: "\(report.remainingDuplicateGroupCount) 组"), systemImage: "checkmark.circle")
+                        ReportMetric(title: String(localized: "处理耗时"), value: durationText, systemImage: "clock.fill")
                     }
 
                     VStack(spacing: 12) {
@@ -1026,8 +1026,8 @@ private struct MergeReportView: View {
 
     private var durationText: String {
         report.duration < 1
-            ? String(format: "%.1f 秒", report.duration)
-            : "\(Int(report.duration.rounded())) 秒"
+            ? String(format: String(localized: "%.1f 秒"), locale: .current, report.duration)
+            : String(localized: "\(Int(report.duration.rounded())) 秒")
     }
 }
 

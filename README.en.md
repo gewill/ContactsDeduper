@@ -6,7 +6,7 @@ A local-first contact deduplication and safe merge tool for iOS and macOS, built
 
 [English](README.en.md) · [简体中文](README.md)
 
-[Privacy](PRIVACY.md) · [Security review](SECURITY_REVIEW.md) · [MIT License](LICENSE)
+[Privacy (8 languages)](PRIVACY.en.md) · [Security review](SECURITY_REVIEW.md) · [MIT License](LICENSE)
 
 ## Features
 
@@ -20,6 +20,7 @@ A local-first contact deduplication and safe merge tool for iOS and macOS, built
 - Exports a versioned JSON backup and safely restores missing contacts or missing images.
 - Supports deleting all contacts behind an explicit confirmation.
 - Includes an AppIcon, privacy manifest, and export-compliance declaration for App Store Connect preparation.
+- Supports Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, and German, following the system language automatically.
 
 ## Matching rules
 
@@ -94,6 +95,7 @@ GitHub Actions builds and runs the full unit-test suite on macOS, and runs the i
 - `ContactsDeduperTests/`: matching, merge, backup, and performance tests.
 - `ContactsDeduper/Info.plist` and `ContactsDeduper/Info-macOS.plist`: platform permissions and app configuration.
 - `APP_STORE_PREP.md`: App Store Connect category, privacy, and upload checklist.
+- `AppStoreMetadata.json`: store metadata and privacy-policy links for eight locales.
 
 ## Known limitations
 

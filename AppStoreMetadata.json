@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "localizations": {
+    "zh-Hans": {
+      "name": "ContactsDeduper",
+      "subtitle": "联系人查重与安全合并",
+      "description": "在本机查找并安全合并重复联系人。\n\nContactsDeduper 会按通讯录账户扫描名称、电话号码和邮箱，展示查重依据，并在合并前提供清晰预览。你可以选择保留项、补齐缺失资料、合并同名 List，还可导出 JSON 备份并安全恢复。\n\n所有联系人处理均在设备本地完成，不上传数据，也不包含广告、分析或追踪。",
+      "keywords": "通讯录,联系人,重复联系人,查重,合并,清理,备份,恢复,隐私",
+      "privacyPolicyURL": "https://github.com/gewill/ContactsDeduper/blob/main/PRIVACY.md",
+      "supportURL": "https://github.com/gewill/ContactsDeduper/issues"
+    },
+    "zh-Hant": {
+      "name": "ContactsDeduper",
+      "subtitle": "聯絡人查重與安全合併",
+      "description": "在裝置上尋找並安全合併重複聯絡人。\n\nContactsDeduper 會依通訊錄帳戶掃描姓名、電話號碼及電子郵件，顯示查重依據，並在合併前提供清楚預覽。你可以選擇保留項目、補齊缺少資料、合併同名 List，亦可匯出 JSON 備份並安全還原。\n\n所有聯絡人處理均在裝置上完成，不會上傳資料，也不包含廣告、分析或追蹤。",
+      "keywords": "通訊錄,聯絡人,重複聯絡人,查重,合併,清理,備份,還原,隱私",
+      "privacyPolicyURL": "https://github.com/gewill/ContactsDeduper/blob/main/PRIVACY.zh-Hant.md",
+      "supportURL": "https://github.com/gewill/ContactsDeduper/issues"
+    },
+    "en-US": {
+      "name": "ContactsDeduper",
+      "subtitle": "Find & Merge Duplicates",
+      "description": "Find and safely merge duplicate contacts on your device.\n\nContactsDeduper scans names, phone numbers, and email addresses within the Contacts account you choose. It shows why records match and provides a clear preview before merging. Choose what to keep, fill missing details, merge duplicate Lists, and export or safely restore a JSON backup.\n\nAll contact processing stays on your device. No uploads, ads, analytics, or tracking.",
+      "keywords": "contacts,duplicates,merge,cleanup,address book,backup,restore,privacy",
+      "privacyPolicyURL": "https://github.com/gewill/ContactsDeduper/blob/main/PRIVACY.en.md",
+      "supportURL": "https://github.com/gewill/ContactsDeduper/issues"
+    },
+    "ja": {
+      "name": "ContactsDeduper",
+      "subtitle": "重複連絡先を安全に整理",
+      "description": "デバイス上で重複する連絡先を見つけ、安全に統合します。\n\nContactsDeduper は選択した連絡先アカウント内の名前、電話番号、メールアドレスを確認し、一致した理由と統合前のプレビューを表示します。残す連絡先を選び、不足情報を補完し、同名の List を統合できます。JSON バックアップの書き出しと安全な復元にも対応しています。\n\n連絡先の処理はすべてデバイス上で完結します。アップロード、広告、分析、トラッキングはありません。",
+      "keywords": "連絡先,重複,統合,整理,電話帳,バックアップ,復元,プライバシー",
+      "privacyPolicyURL": "https://github.com/gewill/ContactsDeduper/blob/main/PRIVACY.ja.md",
+      "supportURL": "https://github.com/gewill/ContactsDeduper/issues"
+    },
+    "ko": {
+      "name": "ContactsDeduper",
+      "subtitle": "중복 연락처 찾기 및 병합",
+      "description": "기기에서 중복 연락처를 찾아 안전하게 병합하세요.\n\nContactsDeduper는 선택한 연락처 계정 안에서 이름, 전화번호, 이메일 주소를 검사합니다. 일치 근거와 병합 전 미리보기를 확인하고, 유지할 연락처를 선택하거나 누락된 정보를 보완할 수 있습니다. 같은 이름의 List 병합과 JSON 백업 내보내기 및 안전한 복원도 지원합니다.\n\n모든 연락처 처리는 기기에서만 이루어집니다. 업로드, 광고, 분석 또는 추적이 없습니다.",
+      "keywords": "연락처,중복,병합,정리,주소록,백업,복원,개인정보",
+      "privacyPolicyURL": "https://github.com/gewill/ContactsDeduper/blob/main/PRIVACY.ko.md",
+      "supportURL": "https://github.com/gewill/ContactsDeduper/issues"
+    },
+    "es-ES": {
+      "name": "ContactsDeduper",
+      "subtitle": "Busca y combina duplicados",
+      "description": "Encuentra y combina contactos duplicados de forma segura en tu dispositivo.\n\nContactsDeduper analiza nombres, números de teléfono y correos dentro de la cuenta de Contactos que elijas. Muestra por qué coinciden los registros y ofrece una vista previa clara antes de combinarlos. Elige qué conservar, completa datos que faltan, combina Lists duplicadas y exporta o restaura una copia JSON.\n\nTodo el procesamiento permanece en tu dispositivo. Sin cargas, anuncios, análisis ni seguimiento.",
+      "keywords": "contactos,duplicados,combinar,limpiar,agenda,copia,restaurar,privacidad",
+      "privacyPolicyURL": "https://github.com/gewill/ContactsDeduper/blob/main/PRIVACY.es.md",
+      "supportURL": "https://github.com/gewill/ContactsDeduper/issues"
+    },
+    "fr-FR": {
+      "name": "ContactsDeduper",
+      "subtitle": "Fusionnez vos doublons",
+      "description": "Trouvez et fusionnez vos contacts en double en toute sécurité sur votre appareil.\n\nContactsDeduper analyse les noms, numéros de téléphone et e-mails du compte Contacts choisi. L’app explique les correspondances et affiche un aperçu clair avant la fusion. Choisissez la fiche à conserver, complétez les données manquantes, fusionnez les Lists en double et exportez ou restaurez une sauvegarde JSON.\n\nTout le traitement reste sur votre appareil. Aucun envoi, publicité, suivi ou outil d’analyse.",
+      "keywords": "contacts,doublons,fusion,nettoyage,carnet,sauvegarde,restauration,vie privée",
+      "privacyPolicyURL": "https://github.com/gewill/ContactsDeduper/blob/main/PRIVACY.fr.md",
+      "supportURL": "https://github.com/gewill/ContactsDeduper/issues"
+    },
+    "de-DE": {
+      "name": "ContactsDeduper",
+      "subtitle": "Kontakte sicher bereinigen",
+      "description": "Finde und vereine doppelte Kontakte sicher auf deinem Gerät.\n\nContactsDeduper prüft Namen, Telefonnummern und E-Mail-Adressen innerhalb des ausgewählten Kontakte-Accounts. Die App zeigt Übereinstimmungsgründe und eine klare Vorschau vor dem Zusammenführen. Wähle den zu behaltenden Kontakt, ergänze fehlende Daten, vereine gleichnamige Listen und exportiere oder stelle ein JSON-Backup sicher wieder her.\n\nAlle Kontaktdaten werden nur auf deinem Gerät verarbeitet. Keine Uploads, Werbung, Analyse oder Nachverfolgung.",
+      "keywords": "Kontakte,Dubletten,zusammenführen,bereinigen,Adressbuch,Backup,Wiederherstellung,Datenschutz",
+      "privacyPolicyURL": "https://github.com/gewill/ContactsDeduper/blob/main/PRIVACY.de.md",
+      "supportURL": "https://github.com/gewill/ContactsDeduper/issues"
+    }
+  }
+}

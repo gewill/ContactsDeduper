@@ -7,6 +7,10 @@ struct PhoneRegionOption: Identifiable, Hashable, Sendable {
     let trunkPrefix: String?
 
     var id: String { code }
+
+    var localizedName: String {
+        Locale.current.localizedString(forRegionCode: code) ?? name
+    }
 }
 
 struct PhoneMatchingContext: Sendable {

@@ -405,17 +405,17 @@ enum ContactsBackupError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .accessDenied:
-            return "请先允许访问通讯录。"
+            return String(localized: "请先允许访问通讯录。")
         case .unreadableFile:
-            return "无法读取所选文件。"
+            return String(localized: "无法读取所选文件。")
         case .fileTooLarge:
-            return "备份文件超过 100 MB，无法导入。"
+            return String(localized: "备份文件超过 100 MB，无法导入。")
         case .invalidFile:
-            return "这不是有效的 ContactsDeduper 备份文件。"
+            return String(localized: "这不是有效的 ContactsDeduper 备份文件。")
         case .unsupportedVersion(let version):
-            return "暂不支持版本 \(version) 的备份文件。"
+            return String(localized: "暂不支持版本 \(version) 的备份文件。")
         case .tooManyContacts:
-            return "备份中的联系人数量异常，已停止导入。"
+            return String(localized: "备份中的联系人数量异常，已停止导入。")
         }
     }
 }
