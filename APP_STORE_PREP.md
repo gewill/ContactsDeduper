@@ -4,7 +4,7 @@
 
 ## 已纳入工程
 
-- `ContactsDeduper/Assets.xcassets/AppIcon.appiconset`：iOS 1024×1024 图标及 macOS 多尺寸图标。
+- `ContactsDeduper/Icon.icon`：由 SVG 矢量图层组成的多层图标，交由 Xcode Icon Composer 自动生成 iOS/macOS 变体。
 - `ContactsDeduper/PrivacyInfo.xcprivacy`：声明不跟踪、不收集数据，并为应用自身的 `UserDefaults` 使用 `CA92.1` required-reason API 理由。
 - `ContactsDeduper/Info.plist` 与 `Info-macOS.plist`：加入 `ITSAppUsesNonExemptEncryption = NO`，声明应用不使用非豁免加密。
 - `Info-macOS.plist`：设置 `LSApplicationCategoryType = public.app-category.utilities`。

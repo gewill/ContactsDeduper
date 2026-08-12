@@ -90,7 +90,7 @@ GitHub Actions builds and runs the full unit-test suite on macOS, and runs the i
 - `ContactsDeduper/ContentView.swift`: account routing, deduplication UI, import/export, bulk actions, and reports.
 - `ContactsDeduper/ContactsManager.swift`: permissions, container-scoped queries, matching, merging, deletion, and Contacts access.
 - `ContactsDeduper/ContactsBackup.swift`: versioned backup model, validation, encoding, and restoration.
-- `ContactsDeduper/Assets.xcassets` and `ContactsDeduper/PrivacyInfo.xcprivacy`: app icons and Apple privacy manifest.
+- `ContactsDeduper/Icon.icon` and `ContactsDeduper/PrivacyInfo.xcprivacy`: Icon Composer vector icon and Apple privacy manifest.
 - `ContactsDeduperTests/`: matching, merge, backup, and performance tests.
 - `ContactsDeduper/Info.plist` and `ContactsDeduper/Info-macOS.plist`: platform permissions and app configuration.
 - `APP_STORE_PREP.md`: App Store Connect category, privacy, and upload checklist.

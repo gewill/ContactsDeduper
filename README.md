@@ -90,7 +90,7 @@ GitHub Actions 会在 macOS 上执行构建和完整单元测试，并在 iOS �
 - `ContactsDeduper/ContentView.swift`：账户路由、查重界面、导入导出、批量操作和报告。
 - `ContactsDeduper/ContactsManager.swift`：权限、容器级查询、查重、合并、删除和 Contacts 数据访问。
 - `ContactsDeduper/ContactsBackup.swift`：版本化备份模型、校验、编码与恢复。
-- `ContactsDeduper/Assets.xcassets`、`ContactsDeduper/PrivacyInfo.xcprivacy`：应用图标与 Apple 隐私清单。
+- `ContactsDeduper/Icon.icon`、`ContactsDeduper/PrivacyInfo.xcprivacy`：Icon Composer 矢量图标与 Apple 隐私清单。
 - `ContactsDeduperTests/`：查重、合并、备份及性能测试。
 - `ContactsDeduper/Info.plist`、`ContactsDeduper/Info-macOS.plist`：平台权限与应用配置。
 - `APP_STORE_PREP.md`：App Store Connect 分类、隐私和上传前检查清单。
