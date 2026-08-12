@@ -9,6 +9,7 @@ ContactsDeduper_*.json
 *.contactsbackup
 ContactBackups/
 website/dist/
+website/node_modules/
 .playwright-cli/
 output/
 *.mobileprovision

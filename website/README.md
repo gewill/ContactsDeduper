@@ -1,10 +1,22 @@
 # ContactsDeduper website
 
-The site is intentionally dependency-free. It renders static HTML, CSS, and a
-small progressive-enhancement script for Cloudflare Pages or Direct Upload.
+The site is a dependency-light Vite project that renders static HTML and CSS
+for Cloudflare Pages or Direct Upload.
+
+Start a local Vite development server:
 
 ```sh
 cd website
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:5173/en/support/`. Vite serves the generated `dist/`
+directory, so rerun `npm run build` after changing source content.
+
+```sh
+cd website
+npm install
 npm run build
 npm run check
 ```
