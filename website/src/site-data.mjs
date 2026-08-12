@@ -1,17 +1,17 @@
 export const locales = [
-  { id: "en", label: "English", privacy: "PRIVACY.en.md", locale: "en-US" },
-  { id: "zh-Hans", label: "简体中文", privacy: "PRIVACY.md", locale: "zh-CN" },
-  { id: "zh-Hant", label: "繁體中文", privacy: "PRIVACY.zh-Hant.md", locale: "zh-TW" },
-  { id: "ja", label: "日本語", privacy: "PRIVACY.ja.md", locale: "ja-JP" },
-  { id: "ko", label: "한국어", privacy: "PRIVACY.ko.md", locale: "ko-KR" },
-  { id: "es", label: "Español", privacy: "PRIVACY.es.md", locale: "es-ES" },
-  { id: "fr", label: "Français", privacy: "PRIVACY.fr.md", locale: "fr-FR" },
-  { id: "de", label: "Deutsch", privacy: "PRIVACY.de.md", locale: "de-DE" }
+  { id: "en", label: "English", privacy: "PRIVACY.en.md", terms: "TERMS.en.md", locale: "en-US" },
+  { id: "zh-Hans", label: "简体中文", privacy: "PRIVACY.md", terms: "TERMS.md", locale: "zh-CN" },
+  { id: "zh-Hant", label: "繁體中文", privacy: "PRIVACY.zh-Hant.md", terms: "TERMS.zh-Hant.md", locale: "zh-TW" },
+  { id: "ja", label: "日本語", privacy: "PRIVACY.ja.md", terms: "TERMS.ja.md", locale: "ja-JP" },
+  { id: "ko", label: "한국어", privacy: "PRIVACY.ko.md", terms: "TERMS.ko.md", locale: "ko-KR" },
+  { id: "es", label: "Español", privacy: "PRIVACY.es.md", terms: "TERMS.es.md", locale: "es-ES" },
+  { id: "fr", label: "Français", privacy: "PRIVACY.fr.md", terms: "TERMS.fr.md", locale: "fr-FR" },
+  { id: "de", label: "Deutsch", privacy: "PRIVACY.de.md", terms: "TERMS.de.md", locale: "de-DE" }
 ];
 
 export const copy = {
   en: {
-    support: "Support", privacy: "Privacy", switchLanguage: "Language", home: "Home",
+    support: "Support", privacy: "Privacy", terms: "Terms of Use", termsIntro: "These terms govern your use of ContactsDeduper.", switchLanguage: "Language", home: "Home",
     title: "Your contacts stay on your device.",
     intro: "ContactsDeduper finds duplicate contacts on your iPhone or Mac, so you can review and merge them carefully. Create a backup before changes, and restore anytime.",
     getSupport: "Get support", readPrivacy: "Read the privacy policy", whatItDoes: "What it does",
@@ -28,11 +28,11 @@ export const copy = {
     github: "GitHub", updated: "Last updated"
   },
   "zh-Hans": {
-    support: "支持", privacy: "隐私", switchLanguage: "语言", home: "首页",
+    support: "支持", privacy: "隐私", terms: "使用条款", termsIntro: "这些条款适用于你对 ContactsDeduper 的使用。", switchLanguage: "语言", home: "首页",
     title: "你的联系人始终留在设备上。", intro: "ContactsDeduper 在 iPhone 或 Mac 上查找重复联系人，让你谨慎地检查和合并。修改前先创建备份，之后也可随时恢复。", getSupport: "获取支持", readPrivacy: "查看隐私政策", whatItDoes: "它能做什么", whatItDoesText: "查找姓名、电话、邮箱等重复联系人。你可以逐组检查并决定要合并哪些联系人。", careful: "为谨慎清理而设计", carefulText: "合并前预览每组重复联系人，选择要保留的资料，并在确认前查看结果。", backup: "备份与恢复", backupText: "修改前创建完整通讯录备份，需要时可以随时恢复。", questions: "常见问题", faq: [["ContactsDeduper 会上传我的联系人吗？", "不会。联系人只在本地处理，不会上传给我们。"], ["合并联系人安全吗？", "你可以预览每组重复联系人，并明确选择要保留的内容。修改前建议导出备份。"], ["可以恢复联系人吗？", "可以，从 ContactsDeduper 创建的备份中恢复。"], ["支持哪些设备和系统版本？", "支持 iOS 17 或更高版本，以及原生 macOS 14 或更高版本。"]], feedback: "如需帮助，请通过 GitHub Issues 联系。请勿附加真实联系人数据或备份文件。", github: "GitHub", updated: "最后更新"
   },
   "zh-Hant": {
-    support: "支援", privacy: "私隱", switchLanguage: "語言", home: "首頁", title: "你的聯絡人始終留在裝置上。", intro: "ContactsDeduper 在 iPhone 或 Mac 上尋找重複聯絡人，讓你仔細檢查及合併。修改前先建立備份，之後也可隨時還原。", getSupport: "取得支援", readPrivacy: "查看私隱政策", whatItDoes: "功能介紹", whatItDoesText: "尋找姓名、電話、電子郵件等重複聯絡人。你可以逐組檢查並決定要合併哪些聯絡人。", careful: "為仔細整理而設", carefulText: "合併前預覽每組重複聯絡人，選擇要保留的資料，並在確認前查看結果。", backup: "備份與還原", backupText: "修改前建立完整通訊錄備份，需要時可以隨時還原。", questions: "常見問題", faq: [["ContactsDeduper 會上傳我的聯絡人嗎？", "不會。聯絡人只在本機處理，不會上傳給我們。"], ["合併聯絡人安全嗎？", "你可以預覽每組重複聯絡人，並明確選擇要保留的內容。修改前建議匯出備份。"], ["可以還原聯絡人嗎？", "可以，從 ContactsDeduper 建立的備份中還原。"], ["支援哪些裝置和系統版本？", "支援 iOS 17 或以上版本，以及原生 macOS 14 或以上版本。"]], feedback: "如需協助，請透過 GitHub Issues 聯絡。請勿附加真實聯絡人資料或備份檔案。", github: "GitHub", updated: "最後更新"
+    support: "支援", privacy: "私隱", terms: "使用條款", termsIntro: "這些條款適用於你對 ContactsDeduper 的使用。", switchLanguage: "語言", home: "首頁", title: "你的聯絡人始終留在裝置上。", intro: "ContactsDeduper 在 iPhone 或 Mac 上尋找重複聯絡人，讓你仔細檢查及合併。修改前先建立備份，之後也可隨時還原。", getSupport: "取得支援", readPrivacy: "查看私隱政策", whatItDoes: "功能介紹", whatItDoesText: "尋找姓名、電話、電子郵件等重複聯絡人。你可以逐組檢查並決定要合併哪些聯絡人。", careful: "為仔細整理而設", carefulText: "合併前預覽每組重複聯絡人，選擇要保留的資料，並在確認前查看結果。", backup: "備份與還原", backupText: "修改前建立完整通訊錄備份，需要時可以隨時還原。", questions: "常見問題", faq: [["ContactsDeduper 會上傳我的聯絡人嗎？", "不會。聯絡人只在本機處理，不會上傳給我們。"], ["合併聯絡人安全嗎？", "你可以預覽每組重複聯絡人，並明確選擇要保留的內容。修改前建議匯出備份。"], ["可以還原聯絡人嗎？", "可以，從 ContactsDeduper 建立的備份中還原。"], ["支援哪些裝置和系統版本？", "支援 iOS 17 或以上版本，以及原生 macOS 14 或以上版本。"]], feedback: "如需協助，請透過 GitHub Issues 聯絡。請勿附加真實聯絡人資料或備份檔案。", github: "GitHub", updated: "最後更新"
   }
 };
 
@@ -46,3 +46,9 @@ Object.assign(copy.ko, { support: "지원", privacy: "개인정보 보호", swit
 Object.assign(copy.es, { support: "Soporte", privacy: "Privacidad", switchLanguage: "Idioma", home: "Inicio", title: "Tus contactos permanecen en tu dispositivo.", intro: "ContactsDeduper encuentra contactos duplicados en tu iPhone o Mac para que puedas revisarlos y combinarlos con cuidado. Crea una copia antes de cambiar nada y restaura cuando quieras.", getSupport: "Obtener soporte", readPrivacy: "Leer la política de privacidad", whatItDoes: "Qué hace", whatItDoesText: "Encuentra contactos duplicados por nombre, teléfono, correo y más. Revisa cada grupo y decide qué combinar.", careful: "Limpieza cuidadosa", carefulText: "Previsualiza cada grupo duplicado antes de combinarlo. Elige qué datos conservar y revisa el resultado.", backup: "Copias y restauración", backupText: "Crea una copia completa antes de hacer cambios y restáurala cuando lo necesites.", questions: "Preguntas frecuentes", faq: [["¿ContactsDeduper sube mis contactos?", "No. Los contactos se procesan localmente y nunca se suben."], ["¿Es seguro combinar contactos?", "Puedes previsualizar cada grupo y elegir exactamente qué conservar. Haz una copia antes de cambiar nada."], ["¿Puedo restaurar mis contactos?", "Sí. Restaura una copia creada con ContactsDeduper."], ["¿Qué sistemas son compatibles?", "Compatible con iOS 17 o posterior y macOS nativo 14 o posterior."]], feedback: "Para obtener ayuda, usa GitHub Issues. No adjuntes datos reales de contactos ni copias de seguridad.", github: "GitHub", updated: "Última actualización" });
 Object.assign(copy.fr, { support: "Assistance", privacy: "Confidentialité", switchLanguage: "Langue", home: "Accueil", title: "Vos contacts restent sur votre appareil.", intro: "ContactsDeduper trouve les contacts en double sur votre iPhone ou Mac pour vous permettre de les vérifier et de les fusionner avec soin. Créez une sauvegarde avant toute modification et restaurez-la à tout moment.", getSupport: "Obtenir de l’aide", readPrivacy: "Lire la politique de confidentialité", whatItDoes: "Fonctionnement", whatItDoesText: "Trouve les doublons par nom, téléphone, e-mail et plus encore. Vérifiez chaque groupe et décidez quoi fusionner.", careful: "Un nettoyage maîtrisé", carefulText: "Prévisualisez chaque groupe avant la fusion. Choisissez les informations à conserver et vérifiez le résultat.", backup: "Sauvegarde et restauration", backupText: "Créez une sauvegarde complète avant toute modification et restaurez-la si nécessaire.", questions: "Questions fréquentes", faq: [["ContactsDeduper téléverse-t-il mes contacts ?", "Non. Les contacts sont traités localement et ne sont jamais téléversés."], ["La fusion est-elle sûre ?", "Vous pouvez prévisualiser chaque groupe et choisir précisément ce qui est conservé. Faites une sauvegarde avant toute modification."], ["Puis-je restaurer mes contacts ?", "Oui. Restaurez une sauvegarde créée avec ContactsDeduper."], ["Quels systèmes sont pris en charge ?", "iOS 17 ou version ultérieure et macOS natif 14 ou version ultérieure."]], feedback: "Pour obtenir de l’aide, utilisez GitHub Issues. N’ajoutez pas de données de contacts réelles ni de sauvegardes.", github: "GitHub", updated: "Dernière mise à jour" });
 Object.assign(copy.de, { support: "Support", privacy: "Datenschutz", switchLanguage: "Sprache", home: "Startseite", title: "Deine Kontakte bleiben auf deinem Gerät.", intro: "ContactsDeduper findet doppelte Kontakte auf deinem iPhone oder Mac, damit du sie sorgfältig prüfen und zusammenführen kannst. Erstelle vor Änderungen ein Backup und stelle es jederzeit wieder her.", getSupport: "Support erhalten", readPrivacy: "Datenschutzerklärung lesen", whatItDoes: "Das kann die App", whatItDoesText: "Findet doppelte Kontakte nach Name, Telefonnummer, E-Mail und mehr. Prüfe jede Gruppe und entscheide, was zusammengeführt wird.", careful: "Sorgfältig aufräumen", carefulText: "Sieh jede doppelte Gruppe vor dem Zusammenführen in der Vorschau an. Wähle die zu behaltenden Daten und prüfe das Ergebnis.", backup: "Backup und Wiederherstellung", backupText: "Erstelle vor Änderungen ein vollständiges Backup und stelle es bei Bedarf wieder her.", questions: "Häufige Fragen", faq: [["Werden meine Kontakte hochgeladen?", "Nein. Kontakte werden lokal verarbeitet und nie hochgeladen."], ["Ist das Zusammenführen sicher?", "Du kannst jede Gruppe in der Vorschau prüfen und genau auswählen, was bleibt. Erstelle vorher ein Backup."], ["Kann ich Kontakte wiederherstellen?", "Ja. Stelle ein mit ContactsDeduper erstelltes Backup wieder her."], ["Welche Systeme werden unterstützt?", "iOS 17 oder neuer sowie natives macOS 14 oder neuer."]], feedback: "Für Hilfe nutze GitHub Issues. Hänge keine echten Kontaktdaten oder Backup-Dateien an.", github: "GitHub", updated: "Zuletzt aktualisiert" });
+
+Object.assign(copy.ja, { terms: "利用規約", termsIntro: "この規約は ContactsDeduper の利用に適用されます。" });
+Object.assign(copy.ko, { terms: "이용 약관", termsIntro: "이 약관은 ContactsDeduper 사용에 적용됩니다." });
+Object.assign(copy.es, { terms: "Términos de uso", termsIntro: "Estos términos se aplican al uso de ContactsDeduper." });
+Object.assign(copy.fr, { terms: "Conditions d’utilisation", termsIntro: "Ces conditions régissent votre utilisation de ContactsDeduper." });
+Object.assign(copy.de, { terms: "Nutzungsbedingungen", termsIntro: "Diese Bedingungen gelten für die Nutzung von ContactsDeduper." });

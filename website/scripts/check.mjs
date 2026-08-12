@@ -5,9 +5,10 @@ import { locales } from "../src/site-data.mjs";
 
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../dist");
 if (!fs.existsSync(dist)) throw new Error("Run npm run build first");
-const required = ["styles.css", "index.html", "404.html"];
+const required = ["styles.css", "favicon.svg", "_headers", "index.html", "404.html"];
 for (const file of required) if (!fs.existsSync(path.join(dist, file))) throw new Error(`Missing ${file}`);
-for (const locale of locales) for (const page of ["support", "privacy"]) {
+const pages = ["support", "privacy", "terms"];
+for (const locale of locales) for (const page of pages) {
   const file = path.join(dist, locale.id, page, "index.html");
   if (!fs.existsSync(file)) throw new Error(`Missing ${locale.id}/${page}`);
   const html = fs.readFileSync(file, "utf8");
@@ -24,4 +25,4 @@ for (const locale of locales) for (const page of ["support", "privacy"]) {
     if (!html.includes(`id="${fragment[1]}"`)) throw new Error(`${locale.id}/${page} links to missing #${fragment[1]}`);
   }
 }
-console.log(`Checked ${locales.length * 2} localized pages and ${required.length} root assets.`);
+console.log(`Checked ${locales.length * pages.length} localized pages and ${required.length} root assets.`);
