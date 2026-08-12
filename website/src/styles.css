@@ -47,8 +47,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .text-link { font-size: 15px; font-weight: 600; }
 .text-link span { display: inline-block; margin-left: 7px; transition: transform .2s ease; }
 .text-link:hover span { transform: translateX(3px); }
-.phone-frame { width: min(410px, 100%); margin: auto; padding: 10px; border: 1px solid #a7b8d680; border-radius: 48px; background: linear-gradient(145deg, #1e2837, #080b11 35%, #1d2735); box-shadow: 0 0 0 1px #05070b, 0 30px 80px #000000a8, 0 0 70px #2d76f266; transform: rotate(1deg); }
-.phone-screen { overflow: hidden; border: 1px solid #303b4b; border-radius: 39px; background: #090d14; color: var(--ink); padding: 18px 15px 13px; }
+.phone-frame { width: min(390px, 100%); aspect-ratio: 390 / 844; margin: auto; padding: 10px; border: 1px solid #a7b8d680; border-radius: 48px; background: linear-gradient(145deg, #1e2837, #080b11 35%, #1d2735); box-shadow: 0 0 0 1px #05070b, 0 30px 80px #000000a8, 0 0 70px #2d76f266; transform: rotate(1deg); }
+.phone-screen { height: 100%; overflow: hidden; border: 1px solid #303b4b; border-radius: 39px; background: #090d14; color: var(--ink); padding: 18px 15px 13px; }
+.mock-content { width: 108.7%; height: 108.7%; margin-left: -4.35%; transform: scale(.92); transform-origin: top center; }
 .phone-notch { width: 106px; height: 25px; border-radius: 20px; background: #020307; margin: -13px auto 9px; }
 .mock-status { display: flex; justify-content: space-between; padding: 0 11px; color: #e8edf6; font-size: 11px; font-weight: 650; }
 .mock-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 26px 11px 23px; }
@@ -131,6 +132,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
   .hero h1 { font-size: clamp(48px, 14vw, 70px); }
   .hero p { font-size: 17px; }
   .phone-frame { width: min(350px, 88vw); transform: none; }
+  .mock-content { width: 122%; height: 122%; margin-left: -11%; transform: scale(.82); }
   .features { grid-template-columns: 1fr; }
   .feature, .feature + .feature, .feature:last-child { padding: 39px 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .feature:last-child { border-bottom: 0; }
