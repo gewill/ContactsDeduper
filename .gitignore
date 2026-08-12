@@ -8,6 +8,9 @@ xcuserdata/
 ContactsDeduper_*.json
 *.contactsbackup
 ContactBackups/
+website/dist/
+.playwright-cli/
+output/
 *.mobileprovision
 *.p12
 *.pem

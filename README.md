@@ -8,6 +8,8 @@
 
 [隐私说明（8 种语言）](PRIVACY.md) · [安全审查](SECURITY_REVIEW.md) · [MIT 许可证](LICENSE)
 
+支持页与多语言隐私政策网站正在建设中，静态站点源码位于 [`website/`](website/)。
+
 ## 功能
 
 - 按本机、iCloud、Google 等通讯录账户列出容器，在选定账户内独立扫描。
@@ -96,6 +98,7 @@ GitHub Actions 会在 macOS 上执行构建和完整单元测试，并在 iOS �
 - `ContactsDeduper/Info.plist`、`ContactsDeduper/Info-macOS.plist`：平台权限与应用配置。
 - `APP_STORE_PREP.md`：App Store Connect 分类、隐私和上传前检查清单。
 - `AppStoreMetadata.json`：8 种商店语言的元数据与对应隐私政策链接。
+- `website/`：可直接部署到 Cloudflare Pages 的多语言静态支持与隐私政策网站。
 
 ## 已知限制
 
