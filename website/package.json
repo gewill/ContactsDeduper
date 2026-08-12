@@ -6,9 +6,11 @@
     "dev": "npm run build && vite dist --host 127.0.0.1",
     "build": "node scripts/build.mjs",
     "check": "node scripts/check.mjs",
+    "deploy:cf": "bash scripts/deploy-cloudflare.sh",
     "preview": "vite preview dist --host 127.0.0.1"
   },
   "devDependencies": {
-    "vite": "^8.2.1"
+    "vite": "^8.2.1",
+    "wrangler": "^4.121.0"
   }
 }
