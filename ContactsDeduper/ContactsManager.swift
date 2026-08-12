@@ -1006,9 +1006,9 @@ final class ContactsManager: ObservableObject {
         case .local:
             return String(localized: "本机")
         case .exchange:
-            return "Exchange"
+            return String(localized: "Exchange")
         case .cardDAV:
-            return "CardDAV"
+            return String(localized: "CardDAV")
         case .unassigned:
             return String(localized: "其他账户")
         @unknown default:
