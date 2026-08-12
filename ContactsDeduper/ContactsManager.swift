@@ -210,6 +210,36 @@ private struct ContactPair: Hashable {
     let second: String
 }
 
+private struct PhoneRegionRule: Sendable {
+    let callingCode: String
+    let trunkPrefix: String?
+}
+
+private struct ParsedPhone: Sendable {
+    let digits: String
+    let extensionDigits: String?
+    let isExplicitInternational: Bool
+    let containsLetters: Bool
+}
+
+private let phoneRegionRules: [String: PhoneRegionRule] = [
+    "US": PhoneRegionRule(callingCode: "1", trunkPrefix: nil),
+    "CA": PhoneRegionRule(callingCode: "1", trunkPrefix: nil),
+    "CN": PhoneRegionRule(callingCode: "86", trunkPrefix: "0"),
+    "GB": PhoneRegionRule(callingCode: "44", trunkPrefix: "0"),
+    "DE": PhoneRegionRule(callingCode: "49", trunkPrefix: "0"),
+    "JP": PhoneRegionRule(callingCode: "81", trunkPrefix: "0"),
+    "TW": PhoneRegionRule(callingCode: "886", trunkPrefix: "0"),
+    "HK": PhoneRegionRule(callingCode: "852", trunkPrefix: nil),
+    "MO": PhoneRegionRule(callingCode: "853", trunkPrefix: nil),
+    "SG": PhoneRegionRule(callingCode: "65", trunkPrefix: nil),
+    "AU": PhoneRegionRule(callingCode: "61", trunkPrefix: "0"),
+    "FR": PhoneRegionRule(callingCode: "33", trunkPrefix: "0"),
+    "ES": PhoneRegionRule(callingCode: "34", trunkPrefix: nil),
+    "IT": PhoneRegionRule(callingCode: "39", trunkPrefix: nil),
+    "IN": PhoneRegionRule(callingCode: "91", trunkPrefix: "0")
+]
+
 extension CNContact {
     /// `CNContactFormatter` needs private sorting keys that no public
     /// `CNContactXXXKey` constant covers, so contacts must be fetched with this
@@ -236,6 +266,12 @@ extension CNContact {
 private extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
+    }
+}
+
+private extension Optional where Wrapped == String {
+    var orEmpty: String {
+        self ?? ""
     }
 }
 
@@ -1018,12 +1054,14 @@ final class ContactsManager: ObservableObject {
     /// can call it directly and scans can run off the main actor.
     nonisolated func findDuplicates(
         in contacts: [CNContact],
-        rule: DuplicateMatchRule
+        rule: DuplicateMatchRule,
+        defaultRegionCode: String? = Locale.current.region?.identifier
     ) -> [DuplicateGroup] {
         var buckets: [String: Set<String>] = [:]
         var byID: [String: CNContact] = [:]
         var reasonByKey: [String: String] = [:]
         var kindByKey: [String: DuplicateMatchKind] = [:]
+        var phoneDisplaysByKey: [String: [String: Set<String>]] = [:]
         // Format each name once; the sorts below reuse it instead of running
         // CNContactFormatter again on every comparison.
         var displayNames: [String: String] = [:]
@@ -1032,14 +1070,14 @@ final class ContactsManager: ObservableObject {
             byID[contact.identifier] = contact
             displayNames[contact.identifier] = contact.displayName
 
-            let phones = contact.phoneNumbers
-                .map { normalizePhone($0.value.stringValue) }
-                .filter { !$0.isEmpty }
-            for phone in phones {
+            let phoneRegion = contactPhoneRegionCode(contact, fallback: defaultRegionCode)
+            for labeledPhone in contact.phoneNumbers {
+                let rawPhone = labeledPhone.value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let phone = phoneMatchKey(rawPhone, defaultRegionCode: phoneRegion) else { continue }
                 let key = "phone:\(phone)"
                 buckets[key, default: []].insert(contact.identifier)
-                reasonByKey[key] = "相同电话 \(phone)"
                 kindByKey[key] = .phone
+                phoneDisplaysByKey[key, default: [:]][contact.identifier, default: []].insert(rawPhone)
             }
 
             let emails = contact.emailAddresses
@@ -1126,10 +1164,19 @@ final class ContactsManager: ObservableObject {
                 idsByRoot[root(id), default: []].insert(id)
             }
             for (rootID, sharedIDs) in idsByRoot where sharedIDs.count > 1 {
+                let description: String
+                if kindByKey[key] == .phone {
+                    let rawValues = Set(
+                        sharedIDs.flatMap { phoneDisplaysByKey[key]?[$0] ?? [] }
+                    ).sorted()
+                    description = "相同电话 \(rawValues.joined(separator: " / "))"
+                } else {
+                    description = reasonByKey[key] ?? "疑似重复"
+                }
                 reasonsByRoot[rootID, default: []].append(
                     DuplicateReason(
                         id: key,
-                        description: reasonByKey[key] ?? "疑似重复",
+                        description: description,
                         contactIDs: sharedIDs
                     )
                 )
@@ -1375,12 +1422,106 @@ final class ContactsManager: ObservableObject {
         return result
     }
 
+    /// A formatting-insensitive storage key. Country conversion is deliberately
+    /// kept out of this function so an unmarked 11-digit Chinese mobile number is
+    /// never mistaken for a NANP number and loses its leading digit.
     nonisolated func normalizePhone(_ value: String) -> String {
-        let digits = value.filter(\.isNumber)
-        if digits.hasPrefix("1"), digits.count == 11 {
-            return String(digits.dropFirst())
+        let parsed = parsePhone(value)
+        if parsed.containsLetters {
+            return value.lowercased().filter { $0.isLetter || $0.isNumber }
         }
-        return digits
+
+        var digits = parsed.digits
+        if parsed.isExplicitInternational, digits.hasPrefix("1"), digits.count == 11 {
+            digits.removeFirst()
+        }
+        return digits + parsed.extensionDigits.map { "x\($0)" }.orEmpty
+    }
+
+    /// Produces a conservative matching key. Explicit international numbers use
+    /// their country code; local numbers use the contact's postal country, then the
+    /// device region. Strong CN-mobile and NANP shapes are safe to infer without a
+    /// region. Unsupported letters and fewer than seven digits are never evidence.
+    nonisolated func phoneMatchKey(
+        _ value: String,
+        defaultRegionCode: String? = Locale.current.region?.identifier
+    ) -> String? {
+        let parsed = parsePhone(value)
+        guard !parsed.containsLetters, parsed.digits.count >= 7 else { return nil }
+
+        let baseKey: String
+        if parsed.isExplicitInternational {
+            baseKey = "+\(parsed.digits)"
+        } else if isChineseMobile(parsed.digits) {
+            baseKey = "+86\(parsed.digits)"
+        } else if isNANPNumber(parsed.digits) {
+            baseKey = "+1\(parsed.digits)"
+        } else if let regionCode = normalizedRegionCode(defaultRegionCode),
+                  let rule = phoneRegionRules[regionCode] {
+            var nationalNumber = parsed.digits
+            if let trunkPrefix = rule.trunkPrefix,
+               nationalNumber.hasPrefix(trunkPrefix),
+               nationalNumber.count > trunkPrefix.count + 6 {
+                nationalNumber.removeFirst(trunkPrefix.count)
+            }
+            baseKey = "+\(rule.callingCode)\(nationalNumber)"
+        } else {
+            baseKey = "national:\(parsed.digits)"
+        }
+
+        return baseKey + parsed.extensionDigits.map { ";ext=\($0)" }.orEmpty
+    }
+
+    private nonisolated func parsePhone(_ value: String) -> ParsedPhone {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let extensionPattern = #"(?i)\s*(?:ext\.?|extension|x|#)\s*(\d+)\s*$"#
+        let extensionRange = trimmed.range(of: extensionPattern, options: .regularExpression)
+        let base = extensionRange.map { String(trimmed[..<$0.lowerBound]) } ?? trimmed
+        let extensionDigits = extensionRange.map {
+            String(trimmed[$0]).compactMap(\.wholeNumberValue).map(String.init).joined()
+        }
+        let isExplicitInternational = base.hasPrefix("+") || base.hasPrefix("00")
+        var digits = base.compactMap(\.wholeNumberValue).map(String.init).joined()
+        if base.hasPrefix("00"), digits.hasPrefix("00") {
+            digits.removeFirst(2)
+        }
+
+        return ParsedPhone(
+            digits: digits,
+            extensionDigits: extensionDigits?.nilIfEmpty,
+            isExplicitInternational: isExplicitInternational,
+            containsLetters: base.rangeOfCharacter(from: .letters) != nil
+        )
+    }
+
+    private nonisolated func normalizedRegionCode(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let code = value.uppercased().replacingOccurrences(of: "_", with: "-")
+        let region = code.split(separator: "-").last.map(String.init) ?? code
+        return region == "UK" ? "GB" : region
+    }
+
+    private nonisolated func contactPhoneRegionCode(
+        _ contact: CNContact,
+        fallback: String?
+    ) -> String? {
+        contact.postalAddresses
+            .lazy
+            .map { $0.value.isoCountryCode.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+            ?? fallback
+    }
+
+    private nonisolated func isChineseMobile(_ digits: String) -> Bool {
+        guard digits.count == 11, digits.first == "1" else { return false }
+        return digits.dropFirst().first.map { ("3"..."9").contains(String($0)) } ?? false
+    }
+
+    private nonisolated func isNANPNumber(_ digits: String) -> Bool {
+        guard digits.count == 10 else { return false }
+        let values = Array(digits)
+        return ("2"..."9").contains(String(values[0]))
+            && ("2"..."9").contains(String(values[3]))
     }
 
     nonisolated func normalizeEmail(_ value: String) -> String {

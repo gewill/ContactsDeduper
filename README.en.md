@@ -97,7 +97,7 @@ GitHub Actions builds and runs the full unit-test suite on macOS, and runs the i
 
 ## Known limitations
 
-- Phone normalization currently focuses on common North American formats; some international numbers may not be recognized automatically.
+- Full international numbers (`+country code`) work in every country and region. Local-format conversion currently covers the United States, Canada, mainland China, the United Kingdom, Germany, Japan, Taiwan, Hong Kong, Macao, Singapore, Australia, France, Spain, Italy, and India. Local numbers elsewhere may not match their international form without region context.
 - JSON backups are not encrypted; treat exported files as sensitive data.
 
 ## License

@@ -97,6 +97,23 @@ final class ContactMergeTests: XCTestCase {
         XCTAssertEqual(merged(keeper, with: other).phoneNumbers.count, 1)
     }
 
+    func testDistinctVanityNumbersAreBothPreserved() {
+        let keeper = makeContact(given: "三", phones: ["800-CONTACT"])
+        let other = makeContact(given: "三", phones: ["800-FLOWERS"])
+
+        XCTAssertEqual(
+            merged(keeper, with: other).phoneNumbers.map { $0.value.stringValue }.sorted(),
+            ["800-CONTACT", "800-FLOWERS"]
+        )
+    }
+
+    func testBaseNumberAndExtensionAreBothPreserved() {
+        let keeper = makeContact(given: "三", phones: ["555-1234"])
+        let other = makeContact(given: "三", phones: ["555-1234 x89"])
+
+        XCTAssertEqual(merged(keeper, with: other).phoneNumbers.count, 2)
+    }
+
     func testEmailCasingDoesNotCreateASecondEntry() {
         let keeper = makeContact(given: "三", emails: ["ann@example.com"])
         let other = makeContact(given: "三", emails: ["ANN@Example.com"])

@@ -195,6 +195,10 @@ struct ContentView: View {
                     }
                 }
             }
+
+            Section("电话格式支持") {
+                PhoneMatchingScopeNotice()
+            }
         }
         .disabled(manager.isLoading)
         .overlay(alignment: .top) {
@@ -203,7 +207,42 @@ struct ContentView: View {
             }
         }
         .animation(.default, value: manager.isLoading)
+}
+
+/// Makes the conservative matching boundary visible before users act on scan
+/// results. Explicit international numbers are universal; converting a national
+/// format needs a supported region from the contact address or current device.
+private struct PhoneMatchingScopeNotice: View {
+    private let supportedRegions = [
+        "美国", "加拿大", "中国大陆", "英国", "德国", "日本", "中国台湾", "中国香港",
+        "中国澳门", "新加坡", "澳大利亚", "法国", "西班牙", "意大利", "印度"
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("完整国际格式适用于所有国家和地区", systemImage: "checkmark.circle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.green)
+
+            Label("本地格式转换仅支持部分地区", systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.orange)
+
+            DisclosureGroup("查看支持的 15 个国家和地区") {
+                Text(supportedRegions.joined(separator: "、"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 6)
+            }
+
+            Text("其他地区请将号码保存为“+国家码”开头的完整国际格式；否则本地格式与国际格式可能无法识别为同一号码。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .contain)
     }
+}
 
     private var backupMenu: some View {
         Menu {
