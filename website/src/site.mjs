@@ -36,7 +36,10 @@ function inline(value) {
 }
 
 export function languageLinks(locales, current, page) {
-  return locales.map((locale) => `<a href="/${locale.id}/${page}/" hreflang="${locale.locale}" lang="${locale.locale}">${locale.label}</a>`).join("");
+  return locales.map((locale) => {
+    const href = page === "home" ? `/${locale.id}/` : `/${locale.id}/${page}/`;
+    return `<a href="${href}" hreflang="${locale.locale}" lang="${locale.locale}">${locale.label}</a>`;
+  }).join("");
 }
 
 export function header({ locale, current, page, locales, labels }) {
