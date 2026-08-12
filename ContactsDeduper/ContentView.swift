@@ -168,7 +168,7 @@ struct ContentView: View {
                 }
             }
 
-            Section("账户") {
+            Section {
                 ForEach(manager.contactAccounts) { account in
                     NavigationLink {
                         AccountDuplicatesView(account: account, manager: manager)
@@ -194,6 +194,10 @@ struct ContentView: View {
                         .padding(.vertical, 5)
                     }
                 }
+            } header: {
+                Text("账户")
+            } footer: {
+                Text("先选择一个账户开始查重；扫描与合并只会在所选账户内进行。")
             }
 
             Section {
