@@ -6,7 +6,9 @@ A local-first contact deduplication and safe merge tool for iOS and macOS, built
 
 [English](README.en.md) · [简体中文](README.md)
 
-[Privacy (8 languages)](PRIVACY.en.md) · [Security review](SECURITY_REVIEW.md) · [MIT License](LICENSE)
+[Website](https://contactsdeduper.gewill.org/) · [Privacy policy](https://contactsdeduper.gewill.org/en/privacy/) · [Terms of Use](https://contactsdeduper.gewill.org/en/terms/) · [Security review](SECURITY_REVIEW.md) · [MIT License](LICENSE)
+
+The multilingual support, privacy, and Terms of Use site is deployed to Cloudflare Pages; its static source is in [`website/`](website/).
 
 ## Features
 
@@ -96,6 +98,7 @@ GitHub Actions builds and runs the full unit-test suite on macOS, and runs the i
 - `ContactsDeduper/Info.plist` and `ContactsDeduper/Info-macOS.plist`: platform permissions and app configuration.
 - `APP_STORE_PREP.md`: App Store Connect category, privacy, and upload checklist.
 - `AppStoreMetadata.json`: store metadata and privacy-policy links for eight locales.
+- `website/`: a dependency-free multilingual support and privacy site for Cloudflare Pages.
 
 ## Known limitations
 

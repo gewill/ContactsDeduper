@@ -6,7 +6,9 @@
 
 [简体中文](README.md) · [English](README.en.md)
 
-[隐私说明（8 种语言）](PRIVACY.md) · [安全审查](SECURITY_REVIEW.md) · [MIT 许可证](LICENSE)
+[官网](https://contactsdeduper.gewill.org/) · [隐私政策](https://contactsdeduper.gewill.org/zh-Hans/privacy/) · [使用条款](https://contactsdeduper.gewill.org/zh-Hans/terms/) · [安全审查](SECURITY_REVIEW.md) · [MIT 许可证](LICENSE)
+
+多语言支持、隐私政策与使用条款官网已部署到 Cloudflare Pages，静态站点源码位于 [`website/`](website/)。
 
 ## 功能
 
@@ -96,6 +98,7 @@ GitHub Actions 会在 macOS 上执行构建和完整单元测试，并在 iOS �
 - `ContactsDeduper/Info.plist`、`ContactsDeduper/Info-macOS.plist`：平台权限与应用配置。
 - `APP_STORE_PREP.md`：App Store Connect 分类、隐私和上传前检查清单。
 - `AppStoreMetadata.json`：8 种商店语言的元数据与对应隐私政策链接。
+- `website/`：可直接部署到 Cloudflare Pages 的多语言静态支持与隐私政策网站。
 
 ## 已知限制
 
