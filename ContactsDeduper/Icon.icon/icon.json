@@ -1,0 +1,46 @@
+{
+  "fill" : {
+    "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
+  },
+  "groups" : [
+    {
+      "blur-material" : 0.5,
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "03-center-check.svg",
+          "name" : "03-center-check"
+        },
+        {
+          "glass" : true,
+          "image-name" : "04-link.svg",
+          "name" : "04-link"
+        },
+        {
+          "glass" : true,
+          "image-name" : "01-left-card.svg",
+          "name" : "01-left-card"
+        },
+        {
+          "glass" : true,
+          "image-name" : "02-right-card.svg",
+          "name" : "02-right-card"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
