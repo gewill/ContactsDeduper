@@ -300,13 +300,50 @@ final class DuplicateMatchingTests: XCTestCase {
 
     func testNANPCountryCodeIsStripped() {
         XCTAssertEqual(
-            manager.normalizePhone("+1 415 555 3695"),
-            manager.normalizePhone("(415) 555-3695")
+            PhoneMatching.storageKey("+1 415 555 3695"),
+            PhoneMatching.storageKey("(415) 555-3695")
         )
     }
 
     func testChineseMobileKeepsItsLeadingDigit() {
-        XCTAssertEqual(manager.normalizePhone("13800138000"), "13800138000")
+        XCTAssertEqual(PhoneMatching.storageKey("13800138000"), "+8613800138000")
+    }
+
+    func testNANPLeadingOneMatchesTheTenDigitFormat() {
+        let contacts = [
+            makeContact(given: "甲", phones: ["1 415 555 3695"]),
+            makeContact(given: "乙", phones: ["415 555 3695"])
+        ]
+
+        XCTAssertEqual(
+            manager.findDuplicates(
+                in: contacts,
+                rule: .phoneOnly,
+                context: PhoneMatchingContext(
+                    defaultRegionCode: "US",
+                    isDefaultRegionAuthoritative: false
+                )
+            ).count,
+            1
+        )
+    }
+
+    func testNANPLeadingOneDoesNotCollideWithChineseInternationalNumber() {
+        let contacts = [
+            makeContact(given: "甲", phones: ["1 415 555 3695"]),
+            makeContact(given: "乙", phones: ["+86 1 415 555 3695"])
+        ]
+
+        XCTAssertTrue(
+            manager.findDuplicates(
+                in: contacts,
+                rule: .phoneOnly,
+                context: PhoneMatchingContext(
+                    defaultRegionCode: "US",
+                    isDefaultRegionAuthoritative: false
+                )
+            ).isEmpty
+        )
     }
 
     func testChineseInternationalAndLocalFormatsMatchUnderDualRule() {
@@ -363,12 +400,34 @@ final class DuplicateMatchingTests: XCTestCase {
                 manager.findDuplicates(
                     in: contacts,
                     rule: .phoneOnly,
-                    defaultRegionCode: fixture.region
+                    context: PhoneMatchingContext(
+                        defaultRegionCode: fixture.region,
+                        isDefaultRegionAuthoritative: false
+                    )
                 ).count,
                 1,
                 "Expected \(fixture.region) local and international formats to match"
             )
         }
+    }
+
+    func testSevenDigitRegionalNumberDropsTheTrunkPrefix() {
+        let contacts = [
+            makeContact(given: "甲", phones: ["0207946"]),
+            makeContact(given: "乙", phones: ["+44 207946"])
+        ]
+
+        XCTAssertEqual(
+            manager.findDuplicates(
+                in: contacts,
+                rule: .phoneOnly,
+                context: PhoneMatchingContext(
+                    defaultRegionCode: "GB",
+                    isDefaultRegionAuthoritative: false
+                )
+            ).count,
+            1
+        )
     }
 
     func testPostalCountryOverridesTheDeviceRegion() {
@@ -377,7 +436,14 @@ final class DuplicateMatchingTests: XCTestCase {
             makeContact(given: "乙", phones: ["+44 20 7946 0958"])
         ]
         XCTAssertEqual(
-            manager.findDuplicates(in: contacts, rule: .phoneOnly, defaultRegionCode: "US").count,
+            manager.findDuplicates(
+                in: contacts,
+                rule: .phoneOnly,
+                context: PhoneMatchingContext(
+                    defaultRegionCode: "US",
+                    isDefaultRegionAuthoritative: false
+                )
+            ).count,
             1
         )
     }
@@ -388,7 +454,14 @@ final class DuplicateMatchingTests: XCTestCase {
             makeContact(given: "乙", phones: ["+44 20 7946 0958"])
         ]
         XCTAssertTrue(
-            manager.findDuplicates(in: contacts, rule: .phoneOnly, defaultRegionCode: "US").isEmpty
+            manager.findDuplicates(
+                in: contacts,
+                rule: .phoneOnly,
+                context: PhoneMatchingContext(
+                    defaultRegionCode: "US",
+                    isDefaultRegionAuthoritative: false
+                )
+            ).isEmpty
         )
     }
 
@@ -401,8 +474,10 @@ final class DuplicateMatchingTests: XCTestCase {
             manager.findDuplicates(
                 in: contacts,
                 rule: .phoneOnly,
-                defaultRegionCode: "IN",
-                isDefaultRegionAuthoritative: true
+                context: PhoneMatchingContext(
+                    defaultRegionCode: "IN",
+                    isDefaultRegionAuthoritative: true
+                )
             ).count,
             1
         )

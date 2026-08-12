@@ -114,6 +114,20 @@ final class ContactMergeTests: XCTestCase {
         XCTAssertEqual(merged(keeper, with: other).phoneNumbers.count, 2)
     }
 
+    func testChineseInternationalAndLocalFormatsAreDeduplicated() {
+        let keeper = makeContact(given: "三", phones: ["13800138000"])
+        let other = makeContact(given: "三", phones: ["+86 138 0013 8000"])
+
+        XCTAssertEqual(merged(keeper, with: other).phoneNumbers.count, 1)
+    }
+
+    func testNANPInternationalAndLocalFormatsAreDeduplicated() {
+        let keeper = makeContact(given: "三", phones: ["1 415 555 3695"])
+        let other = makeContact(given: "三", phones: ["+1 415 555 3695"])
+
+        XCTAssertEqual(merged(keeper, with: other).phoneNumbers.count, 1)
+    }
+
     func testEmailCasingDoesNotCreateASecondEntry() {
         let keeper = makeContact(given: "三", emails: ["ann@example.com"])
         let other = makeContact(given: "三", emails: ["ANN@Example.com"])

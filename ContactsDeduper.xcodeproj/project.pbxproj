@@ -9,12 +9,14 @@
 /* Begin PBXBuildFile section */
 		CC0000000000000000000002 /* ContactsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2C2C2C2C2C2C2C2C2C2C2C /* ContactsManager.swift */; };
 		CC0000000000000000000003 /* ContactsBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */; };
+		CC0000000000000000000004 /* ContactsDeduper/PhoneMatching.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303030303030303030303030 /* ContactsDeduper/PhoneMatching.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		2C2C2C2C2C2C2C2C2C2C2C2C /* ContactsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsDeduper/ContactsManager.swift; sourceTree = SOURCE_ROOT; };
 		2E2E2E2E2E2E2E2E2E2E2E2E /* ContactsDeduper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ContactsDeduper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F2F2F2F2F2F2F2F2F2F2F2F /* ContactsBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsDeduper/ContactsBackup.swift; sourceTree = SOURCE_ROOT; };
+		303030303030303030303030 /* ContactsDeduper/PhoneMatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsDeduper/PhoneMatching.swift; sourceTree = SOURCE_ROOT; };
 		CC0000000000000000000011 /* ContactsDeduperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ContactsDeduperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -193,6 +195,7 @@
 			files = (
 				CC0000000000000000000002 /* ContactsManager.swift in Sources */,
 				CC0000000000000000000003 /* ContactsBackup.swift in Sources */,
+				CC0000000000000000000004 /* ContactsDeduper/PhoneMatching.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
