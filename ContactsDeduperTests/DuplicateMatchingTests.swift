@@ -133,8 +133,8 @@ final class DuplicateMatchingTests: XCTestCase {
             .findDuplicates(in: fixture.contacts, rule: .dual)
             .flatMap(\.reasons)
 
-        XCTAssertEqual(reasons.filter { $0.description.hasPrefix("相同姓名") }.count, 1)
-        XCTAssertEqual(reasons.filter { $0.description.hasPrefix("相同电话") }.count, 1)
+        XCTAssertEqual(reasons.filter { $0.description.hasPrefix("Same name") }.count, 1)
+        XCTAssertEqual(reasons.filter { $0.description.hasPrefix("Same phone number") }.count, 1)
     }
 
     func testReasonOnlyListsMembersOfItsOwnGroup() {
@@ -144,7 +144,7 @@ final class DuplicateMatchingTests: XCTestCase {
         let phoneReason = manager
             .findDuplicates(in: fixture.contacts, rule: .dual)
             .flatMap(\.reasons)
-            .first { $0.description.hasPrefix("相同电话") }
+            .first { $0.description.hasPrefix("Same phone number") }
 
         let named = phoneReason?.contactIDs
             .compactMap { fixture.labels[$0] }
@@ -167,8 +167,8 @@ final class DuplicateMatchingTests: XCTestCase {
 
         XCTAssertEqual(groups.count, 1)
         XCTAssertEqual(
-            groups.first?.reasons.first { $0.description.hasPrefix("相同公司") }?.description,
-            "相同公司 顺丰速运"
+            groups.first?.reasons.first { $0.description.hasPrefix("Same company") }?.description,
+            "Same company 顺丰速运"
         )
     }
 
@@ -275,7 +275,7 @@ final class DuplicateMatchingTests: XCTestCase {
             .map(\.description)
             .sorted()
 
-        XCTAssertEqual(reasons, ["相同姓名 张三", "相同电话 5550000001", "相同电话 5550000002"])
+        XCTAssertEqual(reasons, ["Same name 张三", "Same phone number 5550000001", "Same phone number 5550000002"])
     }
 
     func testLabelsDoNotAffectMatching() {
@@ -355,8 +355,8 @@ final class DuplicateMatchingTests: XCTestCase {
         let groups = manager.findDuplicates(in: contacts, rule: .dual)
         XCTAssertEqual(groups.count, 1)
         XCTAssertEqual(
-            groups.first?.reasons.first { $0.description.hasPrefix("相同电话") }?.description,
-            "相同电话 +8613800138000 / 13800138000"
+            groups.first?.reasons.first { $0.description.hasPrefix("Same phone number") }?.description,
+            "Same phone number +8613800138000 / 13800138000"
         )
     }
 

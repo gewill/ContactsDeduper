@@ -2,28 +2,30 @@ import Foundation
 import XCTest
 
 final class LocalizationTests: XCTestCase {
+    // Catalog keys are stable identifiers. Change localized copy without renaming its key.
     private let supportedLocales = ["en", "zh-Hans", "zh-Hant", "ja", "ko", "es", "fr", "de"]
-    private let localizedCallPattern = #"\b(?:String\s*\(\s*localized\s*:|Text|Button|Label|Section|Picker|NavigationLink|ProgressView|ContentUnavailableView|LabeledContent|Menu|Toggle|TextField|SecureField|navigationTitle|accessibilityLabel|confirmationDialog|alert|help)\s*\(\s*""#
 
     func testEverySupportedLocaleContainsEveryLocalizedString() throws {
-        let tables = try localizationTables()
+        let catalog = try localizationCatalog()
+        XCTAssertEqual(try XCTUnwrap(catalog["sourceLanguage"] as? String), "en")
+        let entries = try XCTUnwrap(catalog["strings"] as? [String: [String: Any]])
+        XCTAssertFalse(entries.isEmpty)
 
-        let expectedKeys = Set(try XCTUnwrap(tables["zh-Hans"]).keys)
-        XCTAssertFalse(expectedKeys.isEmpty)
+        for (key, entry) in entries {
+            XCTAssertNotNil(key.range(of: #"^[a-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)+$"#, options: .regularExpression))
+            let localizations = try XCTUnwrap(entry["localizations"] as? [String: [String: Any]])
+            XCTAssertEqual(Set(localizations.keys), Set(supportedLocales), "\(key) has missing or extra locales")
+            let source = try localizedValue(in: localizations, locale: "en")
 
-        for locale in supportedLocales {
-            let strings = try XCTUnwrap(tables[locale])
-            XCTAssertEqual(Set(strings.keys), expectedKeys, "\(locale) has missing or extra localization keys")
-            XCTAssertTrue(strings.values.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
-
-            for key in expectedKeys {
-                let value = try XCTUnwrap(strings[key])
+            for locale in supportedLocales {
+                let value = try localizedValue(in: localizations, locale: locale)
+                XCTAssertFalse(value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 XCTAssertEqual(
                     try placeholderArguments(in: value),
-                    try placeholderArguments(in: key),
+                    try placeholderArguments(in: source),
                     "\(locale) changed placeholders for \(key)"
                 )
-                if try placeholderArguments(in: key).count > 1 {
+                if try placeholderArguments(in: source).count > 1 {
                     XCTAssertTrue(
                         try placeholders(in: value).allSatisfy(\.isExplicit),
                         "\(locale) must number every placeholder in \(key)"
@@ -33,38 +35,36 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
-    func testEveryLocalizedSourceStringExistsInEveryTable() throws {
-        let expectedKeys = Set(try XCTUnwrap(try localizationTables()["zh-Hans"]).keys)
+    func testSwiftSourceUsesEnglishAndGeneratedCatalogSymbols() throws {
         let sources = try FileManager.default.contentsOfDirectory(
             at: repositoryRoot.appendingPathComponent("ContactsDeduper"),
             includingPropertiesForKeys: nil
         ).filter { $0.pathExtension == "swift" }
-        let literals = try sources.flatMap(localizedLiterals(in:))
-        XCTAssertFalse(literals.isEmpty)
+        let source = try sources.map { try String(contentsOf: $0, encoding: .utf8) }.joined(separator: "\n")
+        XCTAssertTrue(source.contains(".AppStrings."))
 
-        for literal in literals {
-            XCTAssertTrue(
-                expectedKeys.contains(where: literal.matches),
-                "Missing localization key for \(literal.file.lastPathComponent):\(literal.line)"
-            )
-        }
+        let chineseStringLiteral = try NSRegularExpression(pattern: #"\"[^\"\n]*\p{Han}[^\"\n]*\""#)
+        let range = NSRange(source.startIndex..., in: source)
+        XCTAssertTrue(
+            chineseStringLiteral.matches(in: source, range: range).isEmpty,
+            "Swift source should use English identifiers/fallbacks and generated catalog symbols"
+        )
     }
 
     func testNonChineseBundlesResolvePermissionFlowStrings() throws {
         let permissionKeys = [
-            "允许访问通讯录",
-            "打开系统设置",
-            "授予完整通讯录权限",
-            "需要通讯录权限"
+            "permission.allowContactsAccess",
+            "common.openSystemSettings",
+            "permission.grantFullContactsAccess",
+            "permission.contactsAccessRequired"
         ]
+        let bundle = Bundle(for: Self.self)
 
         for locale in supportedLocales.filter({ !$0.hasPrefix("zh") }) {
-            let bundleURL = repositoryRoot
-                .appendingPathComponent("ContactsDeduper")
-                .appendingPathComponent("\(locale).lproj")
-            let bundle = try XCTUnwrap(Bundle(url: bundleURL))
+            let localizationURL = try XCTUnwrap(bundle.url(forResource: locale, withExtension: "lproj"))
+            let localizedBundle = try XCTUnwrap(Bundle(url: localizationURL))
             for key in permissionKeys {
-                let localized = bundle.localizedString(forKey: key, value: nil, table: nil)
+                let localized = localizedBundle.localizedString(forKey: key, value: nil, table: "AppStrings")
                 XCTAssertNotEqual(localized, key, "\(locale) displayed the source key for \(key)")
                 XCTAssertFalse(localized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
@@ -123,18 +123,26 @@ final class LocalizationTests: XCTestCase {
         return try XCTUnwrap(propertyList as? [String: String], "Invalid strings file: \(url.path)")
     }
 
-    private func localizationTables() throws -> [String: [String: String]] {
-        let resources = repositoryRoot.appendingPathComponent("ContactsDeduper")
-        return try supportedLocales.reduce(into: [:]) { result, locale in
-            let file = resources
-                .appendingPathComponent("\(locale).lproj")
-                .appendingPathComponent("Localizable.strings")
-            result[locale] = try loadStrings(at: file)
-        }
+    private func localizationCatalog() throws -> [String: Any] {
+        let file = repositoryRoot
+            .appendingPathComponent("ContactsDeduper")
+            .appendingPathComponent("AppStrings.xcstrings")
+        let data = try Data(contentsOf: file)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func localizedValue(
+        in localizations: [String: [String: Any]],
+        locale: String
+    ) throws -> String {
+        let localization = try XCTUnwrap(localizations[locale])
+        let stringUnit = try XCTUnwrap(localization["stringUnit"] as? [String: String])
+        XCTAssertEqual(stringUnit["state"], "translated", locale)
+        return try XCTUnwrap(stringUnit["value"])
     }
 
     private func placeholders(in value: String) throws -> [Placeholder] {
-        let pattern = #"%(?:(\d+)\$)?(@|lld|\.1f)"#
+        let pattern = #"%(?:(\d+)\$)?(?:\([^)]+\))?(@|lld|\.1f)"#
         let regex = try NSRegularExpression(pattern: pattern)
         let range = NSRange(value.startIndex..., in: value)
         return regex.matches(in: value, range: range).compactMap { match in
@@ -158,56 +166,6 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
-    private func localizedLiterals(in file: URL) throws -> [LocalizedLiteral] {
-        let source = try String(contentsOf: file, encoding: .utf8)
-        let regex = try NSRegularExpression(pattern: localizedCallPattern)
-        let range = NSRange(source.startIndex..., in: source)
-        return regex.matches(in: source, range: range).compactMap { match in
-            guard let matchRange = Range(match.range, in: source) else { return nil }
-            let line = source[..<matchRange.lowerBound].reduce(1) { $1 == "\n" ? $0 + 1 : $0 }
-            guard let segments = stringSegments(in: source, afterOpeningQuote: matchRange.upperBound) else {
-                XCTFail("Unterminated localized string at \(file.lastPathComponent):\(line)")
-                return nil
-            }
-            return LocalizedLiteral(file: file, line: line, segments: segments)
-        }
-    }
-
-    private func stringSegments(
-        in source: String,
-        afterOpeningQuote start: String.Index
-    ) -> [String]? {
-        var index = start
-        var segments = [""]
-        var interpolationDepth = 0
-
-        while index < source.endIndex {
-            let character = source[index]
-            let next = source.index(after: index)
-
-            if interpolationDepth == 0 {
-                if character == "\"" { return segments }
-                if character == "\\", next < source.endIndex {
-                    if source[next] == "(" {
-                        interpolationDepth = 1
-                        segments.append("")
-                        index = source.index(after: next)
-                        continue
-                    }
-                    segments[segments.count - 1].append(source[next])
-                    index = source.index(after: next)
-                    continue
-                }
-                segments[segments.count - 1].append(character)
-            } else if character == "(" {
-                interpolationDepth += 1
-            } else if character == ")" {
-                interpolationDepth -= 1
-            }
-            index = next
-        }
-        return nil
-    }
 }
 
 private struct Placeholder {
@@ -215,23 +173,4 @@ private struct Placeholder {
     let type: String
 
     var isExplicit: Bool { position != nil }
-}
-
-private struct LocalizedLiteral {
-    let file: URL
-    let line: Int
-    let segments: [String]
-
-    func matches(_ key: String) -> Bool {
-        let placeholderPattern = #"%(?:\d+\$)?(?:@|lld|\.1f)"#
-        let pattern = "^" + segments
-            .map { segment in
-                let formatSegment = segments.count > 1
-                    ? segment.replacingOccurrences(of: "%", with: "%%")
-                    : segment
-                return NSRegularExpression.escapedPattern(for: formatSegment)
-            }
-            .joined(separator: placeholderPattern) + "$"
-        return key.range(of: pattern, options: .regularExpression) != nil
-    }
 }

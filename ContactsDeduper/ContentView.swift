@@ -57,7 +57,7 @@ struct ContentView: View {
         NavigationStack {
             Group {
                 if manager.isLoading && manager.contactAccounts.isEmpty {
-                    ProgressView("正在加载通讯录账户")
+                    ProgressView(.AppStrings.accountLoadingContactsAccounts)
                 } else if !manager.permissionState.allowsAccess {
                     permissionView
                 } else if manager.contactAccounts.isEmpty {
@@ -66,7 +66,7 @@ struct ContentView: View {
                     accountList
                 }
             }
-            .navigationTitle("通讯录账户")
+            .navigationTitle(.AppStrings.accountContactsAccounts)
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     backupMenu
@@ -76,7 +76,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .accessibilityLabel("重新加载账户")
+                    .accessibilityLabel(.AppStrings.accountReloadAccount)
                     .disabled(isBusy)
                 }
             }
@@ -89,11 +89,11 @@ struct ContentView: View {
                 guard phase == .active else { return }
                 Task { await manager.refreshAuthorizationStatus() }
             }
-            .alert("提示", isPresented: Binding(
+            .alert(.AppStrings.commonAlert, isPresented: Binding(
                 get: { manager.errorMessage != nil },
                 set: { if !$0 { manager.errorMessage = nil } }
             )) {
-                Button("好") { manager.errorMessage = nil }
+                Button(.AppStrings.commonOk) { manager.errorMessage = nil }
             } message: {
                 Text(manager.errorMessage ?? "")
             }
@@ -106,12 +106,12 @@ struct ContentView: View {
                 switch result {
                 case .success(let url):
                     notice = AppNotice(
-                        message: String(localized: "已导出 \(exportedContactCount) 个联系人到 \(url.lastPathComponent)。")
+                        message: String(localized: .AppStrings.backupExportedContactsTo(value1: exportedContactCount, value2: url.lastPathComponent))
                     )
                 case .failure(let error) where isUserCancellation(error):
                     break
                 case .failure(let error):
-                    notice = AppNotice(message: String(localized: "导出失败：\(error.localizedDescription)"))
+                    notice = AppNotice(message: String(localized: .AppStrings.backupExportFailed(value1: error.localizedDescription)))
                 }
             }
             .fileImporter(isPresented: $isImporting, allowedContentTypes: [.item]) { result in
@@ -122,35 +122,35 @@ struct ContentView: View {
                 isPresented: $showImportConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("开始安全恢复") {
+                Button(.AppStrings.backupStartSafeRecovery) {
                     guard let pendingImport else { return }
                     Task { await restoreContacts(from: pendingImport) }
                 }
-                Button("取消", role: .cancel) {
+                Button(.AppStrings.commonCancel, role: .cancel) {
                     pendingImport = nil
                 }
             } message: {
                 if let pendingImport {
-                    Text("备份时间：\(pendingImport.preview.exportedAt.formatted(date: .abbreviated, time: .shortened))。文件内共 \(pendingImport.preview.contactCount) 个联系人，预计新增 \(pendingImport.preview.contactsToAdd) 个。现有联系人不会被删除或覆盖。")
+                    Text(.AppStrings.backupImportPreview(value1: pendingImport.preview.exportedAt.formatted(date: .abbreviated, time: .shortened), value2: pendingImport.preview.contactCount, value3: pendingImport.preview.contactsToAdd))
                 }
             }
             .confirmationDialog(
-                "删除全部可访问联系人？",
+                .AppStrings.deleteAllConfirmationTitle,
                 isPresented: $showDeleteAllConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("永久删除全部联系人", role: .destructive) {
+                Button(.AppStrings.deleteAllPermanentlyDeleteAllContacts, role: .destructive) {
                     Task { await deleteAllContacts() }
                 }
-                Button("取消", role: .cancel) {}
+                Button(.AppStrings.commonCancel, role: .cancel) {}
             } message: {
-                Text("此操作会删除所有账户中可访问的联系人且不可撤销。请先导出备份。")
+                Text(.AppStrings.deleteAllConfirmationMessage)
             }
             .alert(item: $notice) { notice in
                 Alert(
-                    title: Text("操作结果"),
+                    title: Text(.AppStrings.reportOperationResult),
                     message: Text(notice.message),
-                    dismissButton: .default(Text("好"))
+                    dismissButton: .default(Text(.AppStrings.commonOk))
                 )
             }
         }
@@ -187,7 +187,7 @@ struct ContentView: View {
                             }
 
                             Spacer()
-                            Text("\(account.contactCount) 人")
+                            Text(.AppStrings.contactCount(value1: account.contactCount))
                                 .font(.subheadline.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
@@ -195,33 +195,33 @@ struct ContentView: View {
                     }
                 }
             } header: {
-                Text("账户")
+                Text(.AppStrings.accountAccount)
             } footer: {
-                Text("先选择一个账户开始查重；扫描与合并只会在所选账户内进行。")
+                Text(.AppStrings.accountSelectionHint)
             }
 
             Section {
-                Picker("本地号码默认地区", selection: defaultPhoneRegionBinding) {
-                    Text("自动（设备地区）").tag(String?.none)
+                Picker(.AppStrings.phoneDefaultRegionForLocalNumbers, selection: defaultPhoneRegionBinding) {
+                    Text(.AppStrings.phoneAutomaticDeviceRegion).tag(String?.none)
                     ForEach(supportedPhoneRegions) { region in
-                        Text("\(region.localizedName)（\(region.code)）").tag(Optional(region.code))
+                        Text(.AppStrings.commonNameAndCode(value1: region.localizedName, value2: region.code)).tag(Optional(region.code))
                     }
                 }
                 .pickerStyle(.menu)
 
-                NavigationLink("电话格式支持") {
+                NavigationLink(.AppStrings.phoneSupportTitle) {
                     PhoneMatchingSupportView()
                 }
             } header: {
-                Text("号码识别")
+                Text(.AppStrings.phonePhoneMatching)
             } footer: {
-                Text("默认地区仅用于地址中未指定国家或地区的本地号码；修改后会立即重新判定。")
+                Text(.AppStrings.phoneDefaultRegionDescription)
             }
         }
         .disabled(manager.isLoading)
         .overlay(alignment: .top) {
             if manager.isLoading {
-                ScanningBanner(title: String(localized: "正在扫描通讯录"))
+                ScanningBanner(title: String(localized: .AppStrings.progressScanningContacts))
             }
         }
         .animation(.default, value: manager.isLoading)
@@ -239,29 +239,29 @@ struct ContentView: View {
     private struct PhoneMatchingSupportView: View {
         var body: some View {
             List {
-                Section("识别范围") {
-                    Label("完整国际格式适用于所有国家和地区", systemImage: "checkmark.circle.fill")
+                Section(.AppStrings.phoneCoverageTitle) {
+                    Label(.AppStrings.phoneFullInternationalFormatAvailableForAllCountriesAndRegions, systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
 
-                    Label("本地格式转换仅支持以下地区", systemImage: "exclamationmark.triangle.fill")
+                    Label(.AppStrings.phoneLocalFormatConversionOnlySupportsTheFollowingRegions, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                 }
 
-                Section("支持本地格式的 \(supportedPhoneRegions.count) 个国家和地区") {
+                Section(.AppStrings.phoneSupportsLocalFormatsInCountriesAndRegions(value1: supportedPhoneRegions.count)) {
                     ForEach(supportedPhoneRegions) { region in
                         LabeledContent(region.localizedName) {
-                            Text("+\(region.callingCode) · \(region.code)")
+                            Text(.AppStrings.mergeAdditionGrowth(value1: region.callingCode, value2: region.code))
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
 
                 Section {
-                    Text("其他地区请将号码保存为“+国家码”开头的完整国际格式；否则本地格式与国际格式可能无法识别为同一号码。")
+                    Text(.AppStrings.phoneOtherRegionsHint)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("电话格式支持")
+            .navigationTitle(.AppStrings.phoneSupportTitle)
         }
     }
 
@@ -270,13 +270,13 @@ struct ContentView: View {
             Button {
                 prepareExport()
             } label: {
-                Label("导出备份", systemImage: "square.and.arrow.up")
+                Label(.AppStrings.backupExportBackup, systemImage: "square.and.arrow.up")
             }
 
             Button {
                 isImporting = true
             } label: {
-                Label("从备份恢复", systemImage: "square.and.arrow.down")
+                Label(.AppStrings.backupRestoreFromBackup, systemImage: "square.and.arrow.down")
             }
 
             Divider()
@@ -284,21 +284,21 @@ struct ContentView: View {
             Button(role: .destructive) {
                 showDeleteAllConfirmation = true
             } label: {
-                Label("删除全部联系人", systemImage: "trash")
+                Label(.AppStrings.deleteAllDeleteAllContacts, systemImage: "trash")
             }
             .disabled(manager.totalContactCount == 0)
         } label: {
             Image(systemName: "archivebox")
         }
-        .accessibilityLabel("备份与恢复")
+        .accessibilityLabel(.AppStrings.backupBackupRestore)
         .disabled(isBusy)
     }
 
     private var importDialogTitle: String {
-        guard let pendingImport else { return String(localized: "确认恢复通讯录？") }
+        guard let pendingImport else { return String(localized: .AppStrings.backupRestoreContacts) }
         return pendingImport.preview.contactsToAdd == 0
-            ? String(localized: "备份中的联系人已存在")
-            : String(localized: "恢复 \(pendingImport.preview.contactsToAdd) 个联系人？")
+            ? String(localized: .AppStrings.backupTheContactsInTheBackupAlreadyExist)
+            : String(localized: .AppStrings.backupRecoverContacts(value1: pendingImport.preview.contactsToAdd))
     }
 
     private var backupFilename: String {
@@ -317,7 +317,7 @@ struct ContentView: View {
                     .contacts.count
                 isExporting = true
             } catch {
-                notice = AppNotice(message: String(localized: "无法创建备份：\(error.localizedDescription)"))
+                notice = AppNotice(message: String(localized: .AppStrings.backupUnableToCreateBackup(value1: error.localizedDescription)))
             }
         }
     }
@@ -351,7 +351,7 @@ struct ContentView: View {
                 pendingImport = PendingContactImport(data: data, preview: preview)
                 showImportConfirmation = true
             } catch {
-                notice = AppNotice(message: String(localized: "无法导入备份：\(error.localizedDescription)"))
+                notice = AppNotice(message: String(localized: .AppStrings.backupUnableToImportBackup(value1: error.localizedDescription)))
             }
         }
     }
@@ -360,9 +360,9 @@ struct ContentView: View {
     private func deleteAllContacts() async {
         do {
             let deletedCount = try await manager.deleteAllContacts()
-            notice = AppNotice(message: String(localized: "已删除 \(deletedCount) 个联系人。可通过之前导出的备份恢复。"))
+            notice = AppNotice(message: String(localized: .AppStrings.backupContactsHaveBeenDeletedCanBeRestoredFromAPreviouslyExportedBackup(value1: deletedCount)))
         } catch {
-            notice = AppNotice(message: String(localized: "删除失败：\(error.localizedDescription)"))
+            notice = AppNotice(message: String(localized: .AppStrings.commonDeletionFailed(value1: error.localizedDescription)))
         }
     }
 
@@ -370,24 +370,24 @@ struct ContentView: View {
     private func restoreContacts(from pending: PendingContactImport) async {
         do {
             let result = try await manager.importBackup(data: pending.data)
-            var message = String(localized: "已恢复 \(result.addedCount) 个联系人，跳过 \(result.skippedCount) 个已有联系人。")
+            var message = String(localized: .AppStrings.backupRestoredContactsSkippingExistingContacts(value1: result.addedCount, value2: result.skippedCount))
             if result.restoredImageCount > 0 {
-                message += String(localized: " 同时补回 \(result.restoredImageCount) 张头像。")
+                message += String(localized: .AppStrings.backupRestoreImagesSuffix(value1: result.restoredImageCount))
             }
             notice = AppNotice(message: message)
         } catch {
-            notice = AppNotice(message: String(localized: "恢复失败，现有联系人未被删除：\(error.localizedDescription)"))
+            notice = AppNotice(message: String(localized: .AppStrings.backupRestoreFailedExistingContactsWereNotDeleted(value1: error.localizedDescription)))
         }
         pendingImport = nil
     }
 
     private var emptyView: some View {
         ContentUnavailableView {
-            Label("没有可用通讯录账户", systemImage: "person.crop.rectangle.stack")
+            Label(.AppStrings.accountNoContactsAccountsAvailable, systemImage: "person.crop.rectangle.stack")
         } description: {
-            Text("系统没有返回可访问的本机、iCloud 或其他通讯录账户。")
+            Text(.AppStrings.permissionTheSystemDidNotReturnAnyAccessibleOnMyDeviceIcloudOrOtherContactsAccounts)
         } actions: {
-            Button("重新加载") {
+            Button(.AppStrings.commonReload) {
                 Task { await manager.loadAccounts() }
             }
             .buttonStyle(.borderedProminent)
@@ -402,23 +402,23 @@ struct ContentView: View {
         } actions: {
             switch manager.permissionState {
             case .notDetermined:
-                Button("允许访问通讯录") {
+                Button(.AppStrings.permissionAllowContactsAccess) {
                     Task { await manager.requestAccessAndLoad() }
                 }
                 .buttonStyle(.borderedProminent)
 
             case .denied:
-                Button("打开系统设置") {
+                Button(.AppStrings.commonOpenSystemSettings) {
                     openContactsPrivacySettings()
                 }
                 .buttonStyle(.borderedProminent)
 
 #if os(macOS)
-                Button("我已开启，重新打开应用") {
+                Button(.AppStrings.commonEnabledReopenApp) {
                     relaunchApp()
                 }
 #else
-                Button("我已开启，重新检查") {
+                Button(.AppStrings.commonEnabledCheckAgain) {
                     Task { await manager.refreshAuthorizationStatus() }
                 }
 #endif
@@ -432,18 +432,18 @@ struct ContentView: View {
     private var permissionTitle: String {
         switch manager.permissionState {
         case .restricted:
-            return String(localized: "通讯录访问被限制")
+            return String(localized: .AppStrings.permissionContactsAccessRestricted)
         default:
-            return String(localized: "需要通讯录权限")
+            return String(localized: .AppStrings.permissionContactsAccessRequired)
         }
     }
 
     private var permissionDescription: String {
         switch manager.permissionState {
         case .notDetermined:
-            return String(localized: "ContactsDeduper 需要读取通讯录才能查找重复联系人。全部处理都在本机完成，不会上传。")
+            return String(localized: .AppStrings.permissionIntroduction)
         case .restricted:
-            return String(localized: "屏幕使用时间或设备管理配置禁止访问通讯录，需要由管理者解除限制，在设置中打开开关无效。")
+            return String(localized: .AppStrings.permissionRestrictedDescription)
         default:
             return settingsPathHint
         }
@@ -451,11 +451,11 @@ struct ContentView: View {
 
     private var settingsPathHint: String {
 #if os(iOS)
-        return String(localized: "通讯录访问已被拒绝。前往「设置 › ContactsDeduper › 通讯录」打开开关，回到应用后会自动重新扫描。")
+        return String(localized: .AppStrings.permissionDeniedIOSDescription)
 #else
         // macOS caches the decision for the life of the process, so no amount of
         // re-checking helps — the app has to start again.
-        return String(localized: "通讯录访问已被拒绝。前往「系统设置 › 隐私与安全性 › 通讯录」勾选 ContactsDeduper，然后重新打开应用，权限才会生效。")
+        return String(localized: .AppStrings.permissionDeniedMacOSDescription)
 #endif
     }
 }
@@ -471,7 +471,7 @@ private struct AccountDuplicatesView: View {
     var body: some View {
         Group {
             if manager.isLoading && manager.allContacts.isEmpty {
-                ProgressView("正在扫描“\(account.name)”")
+                ProgressView(.AppStrings.progressScanningAccount(value1: account.name))
             } else if manager.duplicateGroups.isEmpty && manager.duplicateContactLists.isEmpty {
                 emptyView
             } else {
@@ -482,7 +482,7 @@ private struct AccountDuplicatesView: View {
         // not blank the list out from under the user.
         .overlay(alignment: .top) {
             if manager.isLoading && !manager.allContacts.isEmpty {
-                ScanningBanner(title: String(localized: "正在重新扫描"))
+                ScanningBanner(title: String(localized: .AppStrings.progressRescanning))
             }
         }
         .animation(.default, value: manager.isLoading)
@@ -498,7 +498,7 @@ private struct AccountDuplicatesView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .accessibilityLabel("重新扫描账户")
+                .accessibilityLabel(.AppStrings.accountRescanAccount)
                 .disabled(isMerging || manager.isLoading)
             }
         }
@@ -517,16 +517,16 @@ private struct AccountDuplicatesView: View {
             .presentationDetentsOnIOS()
         }
         .confirmationDialog(
-            "合并 \(manager.duplicateContactLists.count) 组同名 List？",
+            .AppStrings.duplicateListMergeConfirmationTitle(value1: manager.duplicateContactLists.count),
             isPresented: $showListMergeConfirmation,
             titleVisibility: .visible
         ) {
-            Button("合并同名 List", role: .destructive) {
+            Button(.AppStrings.duplicateListMergeAction, role: .destructive) {
                 Task { await mergeLists() }
             }
-            Button("取消", role: .cancel) {}
+            Button(.AppStrings.commonCancel, role: .cancel) {}
         } message: {
-            Text("只处理“\(account.name)”账户。成员会汇总到保留的 List，再删除其余同名 List；不会删除联系人。")
+            Text(.AppStrings.duplicateListMergeConfirmation(value1: account.name))
         }
         .sheet(item: $mergeReport) { report in
             MergeReportView(report: report)
@@ -534,9 +534,9 @@ private struct AccountDuplicatesView: View {
         }
         .alert(item: $notice) { notice in
             Alert(
-                title: Text("操作结果"),
+                title: Text(.AppStrings.reportOperationResult),
                 message: Text(notice.message),
-                dismissButton: .default(Text("好"))
+                dismissButton: .default(Text(.AppStrings.commonOk))
             )
         }
     }
@@ -548,14 +548,14 @@ private struct AccountDuplicatesView: View {
     private var matchRuleBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label("账户内查重", systemImage: "sparkle.magnifyingglass")
+                Label(.AppStrings.accountFindDuplicatesInAccount, systemImage: "sparkle.magnifyingglass")
                 Spacer()
-                Text("共 \(manager.allContacts.count) 人")
+                Text(.AppStrings.contactTotalCount(value1: manager.allContacts.count))
                     .foregroundStyle(.secondary)
             }
             .font(.subheadline.weight(.medium))
 
-            Picker("判定标准", selection: matchRuleBinding) {
+            Picker(.AppStrings.duplicateMatchingRule, selection: matchRuleBinding) {
                 ForEach(DuplicateMatchRule.allCases) { rule in
                     Text(rule.shortTitle).tag(rule)
                 }
@@ -586,7 +586,7 @@ private struct AccountDuplicatesView: View {
                     if let progress = manager.contactListMergeProgress {
                         MergeProgressRow(
                             progress: progress,
-                            status: manager.contactListMergeStatus ?? String(localized: "正在合并 List")
+                            status: manager.contactListMergeStatus ?? String(localized: .AppStrings.progressMergingLists)
                         )
                     }
 
@@ -609,9 +609,9 @@ private struct AccountDuplicatesView: View {
                     }
                 } header: {
                     DedupSectionHeader(
-                        title: String(localized: "重复 List"),
+                        title: String(localized: .AppStrings.duplicateListTitle),
                         count: manager.duplicateContactLists.count,
-                        buttonTitle: String(localized: "合并全部"),
+                        buttonTitle: String(localized: .AppStrings.mergeMergeAll),
                         systemImage: "rectangle.stack.badge.plus",
                         isDisabled: isMerging || manager.duplicateContactLists.isEmpty
                     ) {
@@ -625,7 +625,7 @@ private struct AccountDuplicatesView: View {
                     if let progress = manager.bulkMergeProgress {
                         MergeProgressRow(
                             progress: progress,
-                            status: manager.bulkMergeStatus ?? String(localized: "正在合并联系人")
+                            status: manager.bulkMergeStatus ?? String(localized: .AppStrings.progressMergingContacts)
                         )
                     }
 
@@ -656,9 +656,9 @@ private struct AccountDuplicatesView: View {
                     }
                 } header: {
                     DedupSectionHeader(
-                        title: String(localized: "重复联系人"),
+                        title: String(localized: .AppStrings.duplicateDuplicateContacts),
                         count: manager.duplicateGroups.count,
-                        buttonTitle: String(localized: "一键合并"),
+                        buttonTitle: String(localized: .AppStrings.mergeOneClickMerge),
                         systemImage: "person.2.badge.gearshape",
                         isDisabled: isMerging || manager.isLoading || manager.duplicateGroups.isEmpty
                     ) {
@@ -672,11 +672,11 @@ private struct AccountDuplicatesView: View {
 
     private var emptyView: some View {
         ContentUnavailableView {
-            Label("这个账户没有重复项", systemImage: "checkmark.seal")
+            Label(.AppStrings.accountThereAreNoDuplicatesInThisAccount, systemImage: "checkmark.seal")
         } description: {
-            Text("已扫描“\(account.name)”中的 \(manager.allContacts.count) 个联系人和 List。可在上方切换判定标准，放宽后可能找出更多重复项。")
+            Text(.AppStrings.accountScanSummary(value1: account.name, value2: manager.allContacts.count))
         } actions: {
-            Button("重新扫描") {
+            Button(.AppStrings.commonRescan) {
                 Task { await manager.loadAccount(account) }
             }
             .buttonStyle(.borderedProminent)
@@ -686,7 +686,7 @@ private struct AccountDuplicatesView: View {
     private func showMergePreview() {
         let items = manager.makeBulkMergePlan()
         guard !items.isEmpty else {
-            notice = AppNotice(message: String(localized: "没有可合并的重复联系人。"))
+            notice = AppNotice(message: String(localized: .AppStrings.mergeThereAreNoDuplicateContactsToMerge))
             return
         }
         mergePlan = BulkMergePlan(
@@ -703,7 +703,7 @@ private struct AccountDuplicatesView: View {
                 expectedScanGeneration: expectedScanGeneration
             )
         } catch {
-            notice = AppNotice(message: String(localized: "联系人合并失败：\(error.localizedDescription)"))
+            notice = AppNotice(message: String(localized: .AppStrings.mergeContactMergeFailed(value1: error.localizedDescription)))
         }
     }
 
@@ -712,10 +712,10 @@ private struct AccountDuplicatesView: View {
         do {
             let result = try await manager.mergeAllDuplicateContactLists()
             notice = AppNotice(
-                message: String(localized: "已合并 \(result.mergedSetCount) 组同名 List，删除 \(result.deletedListCount) 个重复 List，并补充 \(result.addedMemberCount) 位成员。")
+                message: String(localized: .AppStrings.duplicateListMergeResult(value1: result.mergedSetCount, value2: result.deletedListCount, value3: result.addedMemberCount))
             )
         } catch {
-            notice = AppNotice(message: String(localized: "List 合并失败：\(error.localizedDescription)"))
+            notice = AppNotice(message: String(localized: .AppStrings.duplicateListMergeFailed(value1: error.localizedDescription)))
         }
     }
 }
@@ -730,7 +730,7 @@ private struct DedupSectionHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Text("\(title) · \(count) 组")
+            Text(.AppStrings.duplicateSectionSummary(value1: title, value2: count))
             Spacer()
             Button(action: action) {
                 Label(buttonTitle, systemImage: systemImage)
@@ -749,15 +749,15 @@ private struct DedupSectionHeader: View {
 private struct LimitedAccessNotice: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("仅可访问部分联系人", systemImage: "exclamationmark.triangle.fill")
+            Label(.AppStrings.permissionLimitedContactsAccess, systemImage: "exclamationmark.triangle.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.orange)
 
-            Text("你只授权了部分联系人。下面的数量和查重结果都只覆盖这一部分，未授权的联系人不会被扫描，也不会被合并或删除。")
+            Text(.AppStrings.permissionLimitedDescription)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Button("授予完整通讯录权限") {
+            Button(.AppStrings.permissionGrantFullContactsAccess) {
                 openContactsPrivacySettings()
             }
             .buttonStyle(.bordered)
@@ -801,7 +801,7 @@ private struct MergeProgressRow: View {
                 Text(status)
                     .font(.subheadline.weight(.medium))
                 Spacer()
-                Text("\(Int(progress * 100))%")
+                Text(.AppStrings.commonPercentage(value1: Int(progress * 100)))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -862,9 +862,9 @@ private struct BulkMergePreviewView: View {
                     }
                 } header: {
                     HStack {
-                        Text("已选 \(selectedIDs.count) / \(items.count) 组")
+                        Text(.AppStrings.mergeSelectedGroupCount(value1: selectedIDs.count, value2: items.count))
                         Spacer()
-                        Button(isEverythingSelected ? String(localized: "全不选") : String(localized: "全选")) {
+                        Button(isEverythingSelected ? String(localized: .AppStrings.commonSelectNone) : String(localized: .AppStrings.commonSelectAll)) {
                             selectedIDs = isEverythingSelected ? [] : Set(items.map(\.id))
                         }
                         .buttonStyle(.bordered)
@@ -872,17 +872,17 @@ private struct BulkMergePreviewView: View {
                     }
                     .textCase(nil)
                 } footer: {
-                    Text("只处理“\(accountName)”账户。每组保留资料最完整的一项并补齐资料，其余联系人会被删除且不可撤销。建议先导出备份。")
+                    Text(.AppStrings.mergeBulkConfirmation(value1: accountName))
                 }
             }
-            .navigationTitle("合并预览")
+            .navigationTitle(.AppStrings.mergeMergePreview)
             .inlineNavigationTitleOnIOS()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(.AppStrings.commonCancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("合并并删除 \(deletionCount) 项", role: .destructive) {
+                    Button(.AppStrings.mergeMergeAndDeleteItems(value1: deletionCount), role: .destructive) {
                         dismiss()
                         onConfirm(selectedIDs)
                     }
@@ -913,7 +913,7 @@ private struct BulkMergePreviewView: View {
                 Text(item.title)
                     .font(.headline)
 
-                Label("保留 \(item.keeperName)", systemImage: "person.crop.circle.badge.checkmark")
+                Label(.AppStrings.mergeKeepNamedContact(value1: item.keeperName), systemImage: "person.crop.circle.badge.checkmark")
                     .font(.subheadline)
                     .foregroundStyle(.green)
 
@@ -924,7 +924,7 @@ private struct BulkMergePreviewView: View {
                 }
 
                 Label(
-                    "删除 \(item.removedNames.count) 项：\(item.removedSummary)",
+                    .AppStrings.mergeDeleteItemsSummary(value1: item.removedNames.count, value2: item.removedSummary),
                     systemImage: "trash"
                 )
                 .font(.subheadline)
@@ -934,7 +934,7 @@ private struct BulkMergePreviewView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text("依据：\(item.reasonSummary)")
+                Text(.AppStrings.duplicateReasonsLabel(value1: item.reasonSummary))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -965,7 +965,7 @@ private struct MergeReportView: View {
                         .accessibilityHidden(true)
 
                     VStack(spacing: 5) {
-                        Text("同步合并完成")
+                        Text(.AppStrings.mergeMergeCompleted)
                             .font(.title2.weight(.bold))
                         Text(report.completedAt.formatted(date: .abbreviated, time: .shortened))
                             .font(.subheadline)
@@ -976,29 +976,29 @@ private struct MergeReportView: View {
                         columns: [GridItem(.flexible()), GridItem(.flexible())],
                         spacing: 12
                     ) {
-                        ReportMetric(title: String(localized: "已合并"), value: String(localized: "\(report.mergedGroupCount) 组"), systemImage: "person.2.fill")
-                        ReportMetric(title: String(localized: "已清理"), value: String(localized: "\(report.deletedContactCount) 项"), systemImage: "trash.fill")
-                        ReportMetric(title: String(localized: "剩余重复"), value: String(localized: "\(report.remainingDuplicateGroupCount) 组"), systemImage: "checkmark.circle")
-                        ReportMetric(title: String(localized: "处理耗时"), value: durationText, systemImage: "clock.fill")
+                        ReportMetric(title: String(localized: .AppStrings.mergeMerged), value: String(localized: .AppStrings.duplicateGroupCount(value1: report.mergedGroupCount)), systemImage: "person.2.fill")
+                        ReportMetric(title: String(localized: .AppStrings.reportCleaned), value: String(localized: .AppStrings.commonItemCount(value1: report.deletedContactCount)), systemImage: "trash.fill")
+                        ReportMetric(title: String(localized: .AppStrings.duplicateDuplicatesLeft), value: String(localized: .AppStrings.duplicateGroupCount(value1: report.remainingDuplicateGroupCount)), systemImage: "checkmark.circle")
+                        ReportMetric(title: String(localized: .AppStrings.reportProcessingTime), value: durationText, systemImage: "clock.fill")
                     }
 
                     VStack(spacing: 12) {
                         HStack {
-                            Label("联系人总数", systemImage: "person.crop.circle")
+                            Label(.AppStrings.contactTotalLabel, systemImage: "person.crop.circle")
                             Spacer()
-                            Text("\(report.contactCountBefore) → \(report.contactCountAfter)")
+                            Text(.AppStrings.reportBeforeAndAfter(value1: report.contactCountBefore, value2: report.contactCountAfter))
                                 .font(.body.monospacedDigit().weight(.semibold))
                         }
 
                         Divider()
 
                         if report.remainingDuplicateGroupCount == 0 {
-                            Label("本次查重结果已全部处理", systemImage: "checkmark.circle.fill")
+                            Label(.AppStrings.duplicateAllDuplicatesFromThisScanHaveBeenHandled, systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             Label(
-                                "仍有 \(report.remainingDuplicateGroupCount) 组需要检查",
+                                .AppStrings.duplicateRemainingGroups(value1: report.remainingDuplicateGroupCount),
                                 systemImage: "exclamationmark.triangle.fill"
                             )
                             .foregroundStyle(.orange)
@@ -1010,10 +1010,10 @@ private struct MergeReportView: View {
                 .frame(maxWidth: 560)
                 .padding(24)
             }
-            .navigationTitle("合并报告")
+            .navigationTitle(.AppStrings.mergeMergeReport)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button(.AppStrings.commonComplete) { dismiss() }
                 }
             }
         }
@@ -1026,8 +1026,8 @@ private struct MergeReportView: View {
 
     private var durationText: String {
         report.duration < 1
-            ? String(format: String(localized: "%.1f 秒"), locale: .current, report.duration)
-            : String(localized: "\(Int(report.duration.rounded())) 秒")
+            ? String(localized: .AppStrings.durationSecondsDecimal(value1: Float(report.duration)))
+            : String(localized: .AppStrings.durationSeconds(value1: Int(report.duration.rounded())))
     }
 }
 
@@ -1133,7 +1133,7 @@ struct DuplicateDetailView: View {
 
     var body: some View {
         List {
-            Section("查重依据") {
+            Section(.AppStrings.duplicateMatchReasons) {
                 ForEach(group.reasons) { reason in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(reason.description)
@@ -1146,15 +1146,15 @@ struct DuplicateDetailView: View {
                 }
             }
 
-            Section("保留联系人") {
-                Picker("保留", selection: $keeperID) {
+            Section(.AppStrings.mergeKeepContacts) {
+                Picker(.AppStrings.mergeKeepContact, selection: $keeperID) {
                     ForEach(group.contacts, id: \.identifier) { contact in
                         Text(contact.displayName).tag(contact.identifier)
                     }
                 }
             }
 
-            Section("联系人详情") {
+            Section(.AppStrings.commonContactDetails) {
                 ForEach(group.contacts, id: \.identifier) { contact in
                     ContactRow(contact: contact, isKeeper: contact.identifier == keeperID) {
                         Task {
@@ -1169,27 +1169,27 @@ struct DuplicateDetailView: View {
         .inlineNavigationTitleOnIOS()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("合并") {
+                Button(.AppStrings.mergeMerge) {
                     showMergeConfirmation = true
                 }
                 .disabled(group.contacts.count < 2)
             }
         }
         .confirmationDialog(
-            "合并后会删除未保留的重复联系人",
+            .AppStrings.mergeUnretainedDuplicateContactsWillBeDeletedAfterMerging,
             isPresented: $showMergeConfirmation,
             titleVisibility: .visible
         ) {
-            Button("合并并删除重复项", role: .destructive) {
+            Button(.AppStrings.mergeMergeAndRemoveDuplicates, role: .destructive) {
                 guard let keeper = group.contacts.first(where: { $0.identifier == keeperID }) else { return }
                 Task {
                     await manager.merge(group, keeping: keeper)
                     dismiss()
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button(.AppStrings.commonCancel, role: .cancel) {}
         } message: {
-            Text("查重依据：\(group.reasonSummary)。请确认这些联系人确实属于同一个人。")
+            Text(.AppStrings.duplicateMergeConfirmation(value1: group.reasonSummary))
         }
         .detailFrameOnMac()
     }
@@ -1206,7 +1206,7 @@ struct ContactRow: View {
                 Text(contact.displayName)
                     .font(.headline)
                 if isKeeper {
-                    Text("保留")
+                    Text(.AppStrings.mergeKeepContact)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
@@ -1217,7 +1217,7 @@ struct ContactRow: View {
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
                 }
-                .accessibilityLabel("删除联系人")
+                .accessibilityLabel(.AppStrings.commonDeleteContact)
             }
 
             if !contact.phoneSummary.isEmpty {
@@ -1240,7 +1240,7 @@ struct ContactRow: View {
                contact.emailSummary.isEmpty,
                contact.organizationName.isEmpty,
                contact.jobTitle.isEmpty {
-                Text("没有电话、邮箱或单位资料")
+                Text(.AppStrings.contactNoDetails)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

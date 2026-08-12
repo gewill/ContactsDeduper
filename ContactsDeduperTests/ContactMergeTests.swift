@@ -239,11 +239,11 @@ final class ContactMergeTests: XCTestCase {
         )
 
         let summaries = manager.additionSummaries(keeper: keeper, others: [other])
-        XCTAssertTrue(summaries.contains("电话 +2"), "\(summaries)")
-        XCTAssertTrue(summaries.contains("邮箱 +1"), "\(summaries)")
-        XCTAssertTrue(summaries.contains("生日"), "\(summaries)")
-        XCTAssertTrue(summaries.contains("头像"), "\(summaries)")
-        XCTAssertTrue(summaries.contains("公司"), "\(summaries)")
+        XCTAssertTrue(summaries.contains("Phone +2"), "\(summaries)")
+        XCTAssertTrue(summaries.contains("Email +1"), "\(summaries)")
+        XCTAssertTrue(summaries.contains("Birthday"), "\(summaries)")
+        XCTAssertTrue(summaries.contains("Photo"), "\(summaries)")
+        XCTAssertTrue(summaries.contains("Company"), "\(summaries)")
     }
 
     func testPreviewPromisesNothingWhenTheKeeperAlreadyHasEverything() {
@@ -261,36 +261,37 @@ final class ContactMergeTests: XCTestCase {
         let summaries = manager.additionSummaries(keeper: keeper, others: [other])
         let result = merged(keeper, with: other)
 
-        XCTAssertEqual(summaries.contains("电话 +1"), result.phoneNumbers.count == 2)
-        XCTAssertEqual(summaries.contains("邮箱 +1"), result.emailAddresses.count == 1)
+        XCTAssertEqual(summaries.contains("Phone +1"), result.phoneNumbers.count == 2)
+        XCTAssertEqual(summaries.contains("Email +1"), result.emailAddresses.count == 1)
     }
 
     func testPlanItemRendersAdditionsAndRemovals() {
         let nothingNew = BulkMergePlanItem(
             id: "a",
             title: "张三",
-            reasonSummary: "相同姓名 张三",
+            reasonSummary: "Same name 张三",
             keeperName: "张三",
             keeperSummary: "",
             removedNames: ["张三"],
             removedSummaries: [],
             additions: []
         )
-        XCTAssertEqual(nothingNew.additionSummary, "无新增资料")
+        XCTAssertEqual(nothingNew.additionSummary, "No new information")
         XCTAssertEqual(nothingNew.removedSummary, "张三")
 
         let withAdditions = BulkMergePlanItem(
             id: "b",
             title: "张三",
-            reasonSummary: "相同姓名 张三",
+            reasonSummary: "Same name 张三",
             keeperName: "张三",
             keeperSummary: "",
             removedNames: ["张三", "张小三"],
             removedSummaries: [],
-            additions: ["电话 +1", "头像"]
+            additions: ["Phone +1", "Photo"]
         )
-        XCTAssertEqual(withAdditions.additionSummary, "补齐 电话 +1 · 头像")
-        XCTAssertEqual(withAdditions.removedSummary, "张三、张小三")
+        XCTAssertEqual(withAdditions.additionSummary, "Add Phone +1 · Photo")
+        XCTAssertTrue(withAdditions.removedSummary.contains("张三"))
+        XCTAssertTrue(withAdditions.removedSummary.contains("张小三"))
     }
 
     // MARK: - Import preview arithmetic
@@ -376,31 +377,31 @@ final class ContactMergeTests: XCTestCase {
         let contacts = [makeContact(given: "三", family: "张"), makeContact(given: "三", family: "张")]
         let group = DuplicateGroup(
             id: "g",
-            reasons: [DuplicateReason(id: "name:张三", description: "相同姓名 张三", contactIDs: [])],
+            reasons: [DuplicateReason(id: "name:张三", description: "Same name 张三", contactIDs: [])],
             contacts: contacts
         )
 
-        XCTAssertEqual(group.reasonSummary, "相同姓名 张三")
-        XCTAssertEqual(group.detail, "2 个联系人 · 1 条依据")
+        XCTAssertEqual(group.reasonSummary, "Same name 张三")
+        XCTAssertEqual(group.detail, "2 contacts · 1 evidence")
     }
 
     func testGroupSummarisesMultipleReasonsWithACount() {
         let group = DuplicateGroup(
             id: "g",
             reasons: [
-                DuplicateReason(id: "name:张三", description: "相同姓名 张三", contactIDs: []),
-                DuplicateReason(id: "phone:1", description: "相同电话 5550000001", contactIDs: [])
+                DuplicateReason(id: "name:张三", description: "Same name 张三", contactIDs: []),
+                DuplicateReason(id: "phone:1", description: "Same phone number 5550000001", contactIDs: [])
             ],
             contacts: [makeContact(given: "三", family: "张"), makeContact(given: "三", family: "张")]
         )
 
-        XCTAssertEqual(group.reasonSummary, "相同姓名 张三等 2 条依据")
+        XCTAssertEqual(group.reasonSummary, "Same name 张三 and 2 reasons")
     }
 
     func testGroupWithoutReasonsStillDescribesItself() {
         let group = DuplicateGroup(id: "g", reasons: [], contacts: [])
-        XCTAssertEqual(group.reasonSummary, "疑似重复")
-        XCTAssertEqual(group.displayName, "未命名联系人")
+        XCTAssertEqual(group.reasonSummary, "Suspected duplicate")
+        XCTAssertEqual(group.displayName, "Unnamed contact")
     }
 
     func testReasonNamesTheContactsItMatched() {
@@ -408,11 +409,13 @@ final class ContactMergeTests: XCTestCase {
         let second = makeContact(given: "四", family: "李")
         let reason = DuplicateReason(
             id: "phone:1",
-            description: "相同电话 5550000001",
+            description: "Same phone number 5550000001",
             contactIDs: [first.identifier, second.identifier]
         )
 
-        XCTAssertEqual(reason.matchingContactNames(in: [first, second]), "张三、李四")
+        let names = reason.matchingContactNames(in: [first, second])
+        XCTAssertTrue(names.contains("张三"))
+        XCTAssertTrue(names.contains("李四"))
     }
 
     func testReasonCollapsesRepeatedNamesWithACount() {
@@ -420,10 +423,10 @@ final class ContactMergeTests: XCTestCase {
         let second = makeContact(given: "三", family: "张")
         let reason = DuplicateReason(
             id: "phone:1",
-            description: "相同电话 5550000001",
+            description: "Same phone number 5550000001",
             contactIDs: [first.identifier, second.identifier]
         )
 
-        XCTAssertEqual(reason.matchingContactNames(in: [first, second]), "张三（2 个）")
+        XCTAssertEqual(reason.matchingContactNames(in: [first, second]), "张三 (2)")
     }
 }

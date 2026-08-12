@@ -26,21 +26,21 @@ struct PhoneMatchingContext: Sendable {
 }
 
 let supportedPhoneRegions: [PhoneRegionOption] = [
-    PhoneRegionOption(code: "US", name: "美国", callingCode: "1", trunkPrefix: nil),
-    PhoneRegionOption(code: "CA", name: "加拿大", callingCode: "1", trunkPrefix: nil),
-    PhoneRegionOption(code: "CN", name: "中国大陆", callingCode: "86", trunkPrefix: "0"),
-    PhoneRegionOption(code: "GB", name: "英国", callingCode: "44", trunkPrefix: "0"),
-    PhoneRegionOption(code: "DE", name: "德国", callingCode: "49", trunkPrefix: "0"),
-    PhoneRegionOption(code: "JP", name: "日本", callingCode: "81", trunkPrefix: "0"),
-    PhoneRegionOption(code: "TW", name: "中国台湾", callingCode: "886", trunkPrefix: "0"),
-    PhoneRegionOption(code: "HK", name: "中国香港", callingCode: "852", trunkPrefix: nil),
-    PhoneRegionOption(code: "MO", name: "中国澳门", callingCode: "853", trunkPrefix: nil),
-    PhoneRegionOption(code: "SG", name: "新加坡", callingCode: "65", trunkPrefix: nil),
-    PhoneRegionOption(code: "AU", name: "澳大利亚", callingCode: "61", trunkPrefix: "0"),
-    PhoneRegionOption(code: "FR", name: "法国", callingCode: "33", trunkPrefix: "0"),
-    PhoneRegionOption(code: "ES", name: "西班牙", callingCode: "34", trunkPrefix: nil),
-    PhoneRegionOption(code: "IT", name: "意大利", callingCode: "39", trunkPrefix: nil),
-    PhoneRegionOption(code: "IN", name: "印度", callingCode: "91", trunkPrefix: "0")
+    PhoneRegionOption(code: "US", name: "United States", callingCode: "1", trunkPrefix: nil),
+    PhoneRegionOption(code: "CA", name: "Canada", callingCode: "1", trunkPrefix: nil),
+    PhoneRegionOption(code: "CN", name: "China mainland", callingCode: "86", trunkPrefix: "0"),
+    PhoneRegionOption(code: "GB", name: "United Kingdom", callingCode: "44", trunkPrefix: "0"),
+    PhoneRegionOption(code: "DE", name: "Germany", callingCode: "49", trunkPrefix: "0"),
+    PhoneRegionOption(code: "JP", name: "Japan", callingCode: "81", trunkPrefix: "0"),
+    PhoneRegionOption(code: "TW", name: "Taiwan", callingCode: "886", trunkPrefix: "0"),
+    PhoneRegionOption(code: "HK", name: "Hong Kong", callingCode: "852", trunkPrefix: nil),
+    PhoneRegionOption(code: "MO", name: "Macao", callingCode: "853", trunkPrefix: nil),
+    PhoneRegionOption(code: "SG", name: "Singapore", callingCode: "65", trunkPrefix: nil),
+    PhoneRegionOption(code: "AU", name: "Australia", callingCode: "61", trunkPrefix: "0"),
+    PhoneRegionOption(code: "FR", name: "France", callingCode: "33", trunkPrefix: "0"),
+    PhoneRegionOption(code: "ES", name: "Spain", callingCode: "34", trunkPrefix: nil),
+    PhoneRegionOption(code: "IT", name: "Italy", callingCode: "39", trunkPrefix: nil),
+    PhoneRegionOption(code: "IN", name: "India", callingCode: "91", trunkPrefix: "0")
 ]
 
 enum PhoneMatching {
