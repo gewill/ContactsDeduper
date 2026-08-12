@@ -168,7 +168,7 @@ struct ContentView: View {
                 }
             }
 
-            Section("账户") {
+            Section {
                 ForEach(manager.contactAccounts) { account in
                     NavigationLink {
                         AccountDuplicatesView(account: account, manager: manager)
@@ -194,6 +194,28 @@ struct ContentView: View {
                         .padding(.vertical, 5)
                     }
                 }
+            } header: {
+                Text("账户")
+            } footer: {
+                Text("先选择一个账户开始查重；扫描与合并只会在所选账户内进行。")
+            }
+
+            Section {
+                Picker("本地号码默认地区", selection: defaultPhoneRegionBinding) {
+                    Text("自动（设备地区）").tag(String?.none)
+                    ForEach(supportedPhoneRegions) { region in
+                        Text("\(region.name)（\(region.code)）").tag(Optional(region.code))
+                    }
+                }
+                .pickerStyle(.menu)
+
+                NavigationLink("电话格式支持") {
+                    PhoneMatchingSupportView()
+                }
+            } header: {
+                Text("号码识别")
+            } footer: {
+                Text("默认地区仅用于地址中未指定国家或地区的本地号码；修改后会立即重新判定。")
             }
         }
         .disabled(manager.isLoading)
@@ -203,6 +225,44 @@ struct ContentView: View {
             }
         }
         .animation(.default, value: manager.isLoading)
+    }
+
+    private var defaultPhoneRegionBinding: Binding<String?> {
+        Binding(
+            get: { manager.defaultPhoneRegionCode },
+            set: { manager.setDefaultPhoneRegion($0) }
+        )
+    }
+
+    /// Keeps the account list focused while still exposing the complete matching
+    /// boundary before users act on scan results.
+    private struct PhoneMatchingSupportView: View {
+        var body: some View {
+            List {
+                Section("识别范围") {
+                    Label("完整国际格式适用于所有国家和地区", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+
+                    Label("本地格式转换仅支持以下地区", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+
+                Section("支持本地格式的 \(supportedPhoneRegions.count) 个国家和地区") {
+                    ForEach(supportedPhoneRegions) { region in
+                        LabeledContent(region.name) {
+                            Text("+\(region.callingCode) · \(region.code)")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    Text("其他地区请将号码保存为“+国家码”开头的完整国际格式；否则本地格式与国际格式可能无法识别为同一号码。")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("电话格式支持")
+        }
     }
 
     private var backupMenu: some View {

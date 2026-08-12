@@ -239,6 +239,12 @@ private extension String {
     }
 }
 
+private extension Optional where Wrapped == String {
+    var orEmpty: String {
+        self ?? ""
+    }
+}
+
 @MainActor
 final class ContactsManager: ObservableObject {
     @Published private(set) var authorizationStatus = CNContactStore.authorizationStatus(for: .contacts)
@@ -252,10 +258,12 @@ final class ContactsManager: ObservableObject {
     @Published private(set) var contactListMergeProgress: Double?
     @Published private(set) var contactListMergeStatus: String?
     @Published private(set) var matchRule: DuplicateMatchRule = .dual
+    @Published private(set) var defaultPhoneRegionCode: String?
     @Published var isLoading = false
     @Published var errorMessage: String?
 
     private static let matchRuleDefaultsKey = "duplicateMatchRule"
+    private static let defaultPhoneRegionDefaultsKey = "defaultPhoneRegionCode"
 
     /// Bumped whenever a scan starts. A scan discards its results if another one
     /// began while it was running, so a slow account cannot overwrite a newer one.
@@ -283,6 +291,11 @@ final class ContactsManager: ObservableObject {
     init() {
         let storedRule = UserDefaults.standard.string(forKey: Self.matchRuleDefaultsKey)
         matchRule = storedRule.flatMap(DuplicateMatchRule.init(rawValue:)) ?? .dual
+
+        let storedRegion = UserDefaults.standard.string(forKey: Self.defaultPhoneRegionDefaultsKey)
+        defaultPhoneRegionCode = supportedPhoneRegions.contains { $0.code == storedRegion }
+            ? storedRegion
+            : nil
     }
 
     var isBulkMerging: Bool {
@@ -393,7 +406,37 @@ final class ContactsManager: ObservableObject {
         guard rule != matchRule else { return }
         matchRule = rule
         UserDefaults.standard.set(rule.rawValue, forKey: Self.matchRuleDefaultsKey)
-        duplicateGroups = findDuplicates(in: allContacts, rule: rule)
+        duplicateGroups = findDuplicates(
+            in: allContacts,
+            rule: rule,
+            context: phoneMatchingContext
+        )
+    }
+
+    func setDefaultPhoneRegion(_ regionCode: String?) {
+        let supportedCode = regionCode.flatMap { candidate in
+            supportedPhoneRegions.first { $0.code == candidate }?.code
+        }
+        guard supportedCode != defaultPhoneRegionCode else { return }
+
+        defaultPhoneRegionCode = supportedCode
+        if let supportedCode {
+            UserDefaults.standard.set(supportedCode, forKey: Self.defaultPhoneRegionDefaultsKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.defaultPhoneRegionDefaultsKey)
+        }
+        duplicateGroups = findDuplicates(
+            in: allContacts,
+            rule: matchRule,
+            context: phoneMatchingContext
+        )
+    }
+
+    private var phoneMatchingContext: PhoneMatchingContext {
+        PhoneMatchingContext(
+            defaultRegionCode: defaultPhoneRegionCode ?? Locale.current.region?.identifier,
+            isDefaultRegionAuthoritative: defaultPhoneRegionCode != nil
+        )
     }
 
     func makeBackupDocument() async throws -> ContactsBackupDocument {
@@ -784,12 +827,17 @@ final class ContactsManager: ObservableObject {
     /// synchronous and, with image data, slow — no longer freezes the UI.
     private nonisolated func scanAccount(
         _ account: ContactAccount,
-        rule: DuplicateMatchRule
+        rule: DuplicateMatchRule,
+        context: PhoneMatchingContext
     ) async throws -> AccountScan {
         let contacts = try fetchContacts(in: account.id)
         return AccountScan(
             contacts: contacts,
-            duplicateGroups: findDuplicates(in: contacts, rule: rule),
+            duplicateGroups: findDuplicates(
+                in: contacts,
+                rule: rule,
+                context: context
+            ),
             duplicateContactLists: try fetchDuplicateContactLists(in: account)
         )
     }
@@ -882,7 +930,11 @@ final class ContactsManager: ObservableObject {
 
         scanGeneration += 1
         let generation = scanGeneration
-        let scan = try await scanAccount(activeAccount, rule: matchRule)
+        let scan = try await scanAccount(
+            activeAccount,
+            rule: matchRule,
+            context: phoneMatchingContext
+        )
         // A newer scan started while this one was running; its results win.
         guard generation == scanGeneration, let currentAccount = self.activeAccount else { return }
 
@@ -1018,12 +1070,14 @@ final class ContactsManager: ObservableObject {
     /// can call it directly and scans can run off the main actor.
     nonisolated func findDuplicates(
         in contacts: [CNContact],
-        rule: DuplicateMatchRule
+        rule: DuplicateMatchRule,
+        context: PhoneMatchingContext = .automatic
     ) -> [DuplicateGroup] {
         var buckets: [String: Set<String>] = [:]
         var byID: [String: CNContact] = [:]
         var reasonByKey: [String: String] = [:]
         var kindByKey: [String: DuplicateMatchKind] = [:]
+        var phoneDisplaysByKey: [String: [String: Set<String>]] = [:]
         // Format each name once; the sorts below reuse it instead of running
         // CNContactFormatter again on every comparison.
         var displayNames: [String: String] = [:]
@@ -1032,14 +1086,19 @@ final class ContactsManager: ObservableObject {
             byID[contact.identifier] = contact
             displayNames[contact.identifier] = contact.displayName
 
-            let phones = contact.phoneNumbers
-                .map { normalizePhone($0.value.stringValue) }
-                .filter { !$0.isEmpty }
-            for phone in phones {
+            let contactRegion = contactPhoneRegionCode(contact)
+            let phoneRegion = contactRegion ?? context.defaultRegionCode
+            for labeledPhone in contact.phoneNumbers {
+                let rawPhone = labeledPhone.value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let phone = PhoneMatching.matchKey(
+                    rawPhone,
+                    regionCode: phoneRegion,
+                    isRegionAuthoritative: contactRegion != nil || context.isDefaultRegionAuthoritative
+                ) else { continue }
                 let key = "phone:\(phone)"
                 buckets[key, default: []].insert(contact.identifier)
-                reasonByKey[key] = "相同电话 \(phone)"
                 kindByKey[key] = .phone
+                phoneDisplaysByKey[key, default: [:]][contact.identifier, default: []].insert(rawPhone)
             }
 
             let emails = contact.emailAddresses
@@ -1126,10 +1185,19 @@ final class ContactsManager: ObservableObject {
                 idsByRoot[root(id), default: []].insert(id)
             }
             for (rootID, sharedIDs) in idsByRoot where sharedIDs.count > 1 {
+                let description: String
+                if kindByKey[key] == .phone {
+                    let rawValues = Set(
+                        sharedIDs.flatMap { phoneDisplaysByKey[key]?[$0] ?? [] }
+                    ).sorted()
+                    description = "相同电话 \(rawValues.joined(separator: " / "))"
+                } else {
+                    description = reasonByKey[key] ?? "疑似重复"
+                }
                 reasonsByRoot[rootID, default: []].append(
                     DuplicateReason(
                         id: key,
-                        description: reasonByKey[key] ?? "疑似重复",
+                        description: description,
                         contactIDs: sharedIDs
                     )
                 )
@@ -1192,7 +1260,7 @@ final class ContactsManager: ObservableObject {
         keeper.phoneNumbers = uniqueLabeledValues(
             existing: keeper.phoneNumbers,
             incoming: contact.phoneNumbers,
-            normalizer: { normalizePhone($0.value.stringValue) }
+            normalizer: { PhoneMatching.storageKey($0.value.stringValue) }
         )
         keeper.emailAddresses = uniqueLabeledValues(
             existing: keeper.emailAddresses,
@@ -1375,12 +1443,11 @@ final class ContactsManager: ObservableObject {
         return result
     }
 
-    nonisolated func normalizePhone(_ value: String) -> String {
-        let digits = value.filter(\.isNumber)
-        if digits.hasPrefix("1"), digits.count == 11 {
-            return String(digits.dropFirst())
-        }
-        return digits
+    private nonisolated func contactPhoneRegionCode(_ contact: CNContact) -> String? {
+        contact.postalAddresses
+            .lazy
+            .map { $0.value.isoCountryCode.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
     }
 
     nonisolated func normalizeEmail(_ value: String) -> String {
