@@ -7,9 +7,16 @@ const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../dist
 if (!fs.existsSync(dist)) throw new Error("Run npm run build first");
 const required = ["styles.css", "favicon.svg", "_headers", "index.html", "404.html"];
 for (const file of required) if (!fs.existsSync(path.join(dist, file))) throw new Error(`Missing ${file}`);
+const notFoundHTML = fs.readFileSync(path.join(dist, "404.html"), "utf8");
+for (const marker of ['lang="en"', "description", "canonical", 'hreflang="x-default"']) {
+  if (!notFoundHTML.includes(marker)) throw new Error(`404 missing ${marker}`);
+}
 const pages = ["support", "privacy", "terms"];
 const rootHTML = fs.readFileSync(path.join(dist, "index.html"), "utf8");
-if (rootHTML.includes('http-equiv="refresh"')) throw new Error("Root homepage must not redirect");
+for (const marker of ['canonical" href="https://contactsdeduper.gewill.org/en/', 'hreflang="x-default"', 'navigator.language', '"/en/"']) {
+  if (!rootHTML.includes(marker)) throw new Error(`Root homepage missing ${marker}`);
+}
+if (!rootHTML.includes('window.location.replace(target)')) throw new Error("Root homepage missing language fallback");
 for (const locale of locales) {
   const homeFile = path.join(dist, locale.id, "index.html");
   if (!fs.existsSync(homeFile)) throw new Error(`Missing ${locale.id}/ homepage`);

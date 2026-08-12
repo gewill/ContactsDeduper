@@ -81,6 +81,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .mock-bottom-nav i { color: var(--muted); font-size: 17px; font-style: normal; line-height: 1; }
 .mock-bottom-nav .active, .mock-bottom-nav .active i { color: var(--accent); }
 .feature-band { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #090d14; }
+.feedback-callout { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 24px 0; border-bottom: 1px solid var(--line); }
+.feedback-callout > div { display: flex; align-items: baseline; gap: 18px; }
+.feedback-callout strong { color: var(--accent); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+.feedback-callout p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
 .features { width: min(1180px, calc(100% - 48px)); margin: auto; display: grid; grid-template-columns: repeat(3, 1fr); }
 .feature { padding: 59px 42px 67px 0; border-right: 1px solid var(--line); }
 .feature + .feature { padding-left: 42px; }
@@ -138,6 +142,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
   .feature:last-child { border-bottom: 0; }
   .language-band-inner { display: block; }
   .language-band-inner > span { display: block; margin-bottom: 16px; }
+  .feedback-callout { width: min(100% - 36px, 600px); }
+  .feedback-callout > div { display: block; }
+  .feedback-callout p { margin-top: 7px; }
   .faq { padding: 70px 0 90px; }
   .footer-inner { min-height: 125px; align-items: flex-start; padding: 27px 0; flex-direction: column; gap: 22px; }
   .article-layout { display: block; padding: 55px 0 85px; }

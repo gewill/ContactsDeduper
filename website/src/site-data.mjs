@@ -1,4 +1,6 @@
 export const siteURL = "https://contactsdeduper.gewill.org";
+export const siteYear = "2026";
+export const siteUpdated = "August 12, 2026";
 
 export const locales = [
   { id: "en", label: "English", privacy: "PRIVACY.en.md", terms: "TERMS.en.md", locale: "en-US" },
@@ -38,9 +40,8 @@ export const copy = {
   }
 };
 
-const fallback = copy.en;
 for (const locale of locales) {
-  copy[locale.id] ??= { ...fallback, ...copy.en, title: `${fallback.title}` };
+  copy[locale.id] ??= {};
 }
 
 Object.assign(copy.ja, { support: "サポート", privacy: "プライバシー", switchLanguage: "言語", home: "ホーム", title: "連絡先はデバイスに残ります。", intro: "ContactsDeduper は iPhone または Mac 上で重複する連絡先を見つけ、確認してから安全に統合できます。変更前にバックアップを作成し、いつでも復元できます。", getSupport: "サポートを見る", readPrivacy: "プライバシーポリシー", whatItDoes: "できること", whatItDoesText: "名前、電話番号、メールアドレスなどが重複する連絡先を見つけます。グループごとに確認して統合を選べます。", careful: "慎重な整理のために", carefulText: "統合前に重複セットをプレビューし、残す情報を選択して結果を確認できます。", backup: "バックアップと復元", backupText: "変更前に連絡先をバックアップできます。必要なときはいつでも復元できます。", questions: "よくある質問", faq: [["連絡先はアップロードされますか？", "いいえ。連絡先はデバイス上で処理され、私たちにアップロードされません。"], ["連絡先の統合は安全ですか？", "重複セットを確認し、残す内容を選択できます。変更前にバックアップを作成してください。"], ["連絡先を復元できますか？", "はい。ContactsDeduper で作成したバックアップから復元できます。"], ["対応する OS は？", "iOS 17 以降とネイティブ macOS 14 以降に対応しています。"]], feedback: "サポートが必要な場合は GitHub Issues を利用してください。実際の連絡先データやバックアップを添付しないでください。", github: "GitHub", updated: "最終更新" });
@@ -54,3 +55,9 @@ Object.assign(copy.ko, { terms: "이용 약관", termsIntro: "이 약관은 Cont
 Object.assign(copy.es, { terms: "Términos de uso", termsIntro: "Estos términos se aplican al uso de ContactsDeduper." });
 Object.assign(copy.fr, { terms: "Conditions d’utilisation", termsIntro: "Ces conditions régissent votre utilisation de ContactsDeduper." });
 Object.assign(copy.de, { terms: "Nutzungsbedingungen", termsIntro: "Diese Bedingungen gelten für die Nutzung von ContactsDeduper." });
+
+const requiredCopyKeys = ["support", "privacy", "terms", "termsIntro", "switchLanguage", "home", "title", "intro", "getSupport", "readPrivacy", "whatItDoes", "whatItDoesText", "careful", "carefulText", "backup", "backupText", "questions", "faq", "feedback", "github", "updated"];
+for (const locale of locales) {
+  const missing = requiredCopyKeys.filter((key) => copy[locale.id][key] === undefined);
+  if (missing.length) throw new Error(`Missing ${locale.id} copy keys: ${missing.join(", ")}`);
+}
