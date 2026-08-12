@@ -93,6 +93,16 @@ final class LocalizationTests: XCTestCase {
         let localizations = try XCTUnwrap(root["localizations"] as? [String: [String: String]])
         let expectedLocales = Set(["en-US", "zh-Hans", "zh-Hant", "ja", "ko", "es-ES", "fr-FR", "de-DE"])
         XCTAssertEqual(Set(localizations.keys), expectedLocales)
+        let privacyFiles = [
+            "en-US": "PRIVACY.en.md",
+            "zh-Hans": "PRIVACY.md",
+            "zh-Hant": "PRIVACY.zh-Hant.md",
+            "ja": "PRIVACY.ja.md",
+            "ko": "PRIVACY.ko.md",
+            "es-ES": "PRIVACY.es.md",
+            "fr-FR": "PRIVACY.fr.md",
+            "de-DE": "PRIVACY.de.md"
+        ]
 
         for (locale, metadata) in localizations {
             XCTAssertLessThanOrEqual(try XCTUnwrap(metadata["name"]).count, 30, locale)
@@ -101,7 +111,10 @@ final class LocalizationTests: XCTestCase {
             XCTAssertFalse(try XCTUnwrap(metadata["description"]).isEmpty, locale)
 
             let privacyURL = try XCTUnwrap(URL(string: try XCTUnwrap(metadata["privacyPolicyURL"])))
-            let privacyFilename = privacyURL.lastPathComponent
+            XCTAssertEqual(privacyURL.scheme, "https", locale)
+            XCTAssertEqual(privacyURL.host, "contactsdeduper.gewill.org", locale)
+            XCTAssertTrue(privacyURL.path.hasSuffix("/privacy"), locale)
+            let privacyFilename = try XCTUnwrap(privacyFiles[locale])
             XCTAssertTrue(
                 FileManager.default.fileExists(
                     atPath: repositoryRoot.appendingPathComponent(privacyFilename).path
