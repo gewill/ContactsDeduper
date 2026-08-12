@@ -6,9 +6,9 @@
 
 [简体中文](README.md) · [English](README.en.md)
 
-[隐私说明（8 种语言）](PRIVACY.md) · [安全审查](SECURITY_REVIEW.md) · [MIT 许可证](LICENSE)
+[官网](https://contactsdeduper.gewill.org/) · [隐私政策](https://contactsdeduper.gewill.org/zh-Hans/privacy/) · [使用条款](https://contactsdeduper.gewill.org/zh-Hans/terms/) · [安全审查](SECURITY_REVIEW.md) · [MIT 许可证](LICENSE)
 
-支持页与多语言隐私政策网站正在建设中，静态站点源码位于 [`website/`](website/)。
+多语言支持、隐私政策与使用条款官网已部署到 Cloudflare Pages，静态站点源码位于 [`website/`](website/)。
 
 ## 功能
 

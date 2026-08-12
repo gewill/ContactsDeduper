@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { locales, copy } from "../src/site-data.mjs";
+import { siteURL, locales, copy } from "../src/site-data.mjs";
 import { header, footer, markdownToHTML, escapeHTML } from "../src/site.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -15,8 +15,8 @@ fs.copyFileSync(path.join(website, "public/_headers"), path.join(dist, "_headers
 
 function shell({ locale, page, title, description, content }) {
   const labels = copy[locale.id];
-  const alternates = locales.map((entry) => `<link rel="alternate" hreflang="${entry.locale}" href="/${entry.id}/${page}/">`).join("\n    ");
-  return `<!doctype html><html lang="${locale.locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="${escapeHTML(description)}"><meta name="theme-color" content="#ffffff"><title>${escapeHTML(title)} · ContactsDeduper</title><link rel="canonical" href="/${locale.id}/${page}/">${alternates}<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css"></head><body>${header({ locale, current: locale.id, page, locales, labels })}<main>${content}</main>${footer({ locale, labels })}</body></html>`;
+  const alternates = locales.map((entry) => `<link rel="alternate" hreflang="${entry.locale}" href="${siteURL}/${entry.id}/${page}/">`).join("\n    ");
+  return `<!doctype html><html lang="${locale.locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="${escapeHTML(description)}"><meta name="theme-color" content="#ffffff"><title>${escapeHTML(title)} · ContactsDeduper</title><link rel="canonical" href="${siteURL}/${locale.id}/${page}/">${alternates}<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css"></head><body>${header({ locale, current: locale.id, page, locales, labels })}<main>${content}</main>${footer({ locale, labels })}</body></html>`;
 }
 
 for (const locale of locales) {

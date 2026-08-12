@@ -1,6 +1,6 @@
 # Conditions d’utilisation
 
-[English](https://contactsdeduper.app/en/terms/) · [简体中文](https://contactsdeduper.app/zh-Hans/terms/) · [繁體中文](https://contactsdeduper.app/zh-Hant/terms/) · [日本語](https://contactsdeduper.app/ja/terms/) · [한국어](https://contactsdeduper.app/ko/terms/) · [Español](https://contactsdeduper.app/es/terms/) · [Français](https://contactsdeduper.app/fr/terms/) · [Deutsch](https://contactsdeduper.app/de/terms/)
+[English](https://contactsdeduper.gewill.org/en/terms/) · [简体中文](https://contactsdeduper.gewill.org/zh-Hans/terms/) · [繁體中文](https://contactsdeduper.gewill.org/zh-Hant/terms/) · [日本語](https://contactsdeduper.gewill.org/ja/terms/) · [한국어](https://contactsdeduper.gewill.org/ko/terms/) · [Español](https://contactsdeduper.gewill.org/es/terms/) · [Français](https://contactsdeduper.gewill.org/fr/terms/) · [Deutsch](https://contactsdeduper.gewill.org/de/terms/)
 
 Dernière mise à jour : 12 août 2026
 

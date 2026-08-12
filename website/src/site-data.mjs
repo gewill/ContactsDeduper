@@ -1,3 +1,5 @@
+export const siteURL = "https://contactsdeduper.gewill.org";
+
 export const locales = [
   { id: "en", label: "English", privacy: "PRIVACY.en.md", terms: "TERMS.en.md", locale: "en-US" },
   { id: "zh-Hans", label: "简体中文", privacy: "PRIVACY.md", terms: "TERMS.md", locale: "zh-CN" },
